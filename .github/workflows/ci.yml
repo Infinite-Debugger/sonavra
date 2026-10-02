@@ -17,6 +17,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: sonavra
+          POSTGRES_USER: sonavra
+          POSTGRES_PASSWORD: sonavra
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sonavra -d sonavra"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://sonavra:sonavra@localhost:5432/sonavra
+
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -33,18 +51,27 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
-      - name: Commit generated lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Generate initial migration
         if: github.event_name == 'pull_request'
         run: |
-          if ! git diff --quiet -- pnpm-lock.yaml; then
+          if [ ! -d packages/database/prisma/migrations ]; then
+            mkdir -p packages/database/prisma/migrations/20261002222000_initial_schema
+            pnpm --filter @sonavra/database exec prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > packages/database/prisma/migrations/20261002222000_initial_schema/migration.sql
+            printf 'provider = "postgresql"\n' > packages/database/prisma/migrations/migration_lock.toml
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add pnpm-lock.yaml
-            git commit -m "chore: update dependency lockfile"
+            git add packages/database/prisma/migrations
+            git commit -m "feat: add initial database migration"
             git push
           fi
+
+      - name: Apply database migrations
+        run: pnpm db:deploy
 
       - name: Build
         run: pnpm build
