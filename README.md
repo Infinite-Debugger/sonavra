@@ -10,12 +10,13 @@ Sonavra is a transcription workspace for turning audio and video into searchable
 ## Setup
 
 ```sh
-cp .env.example .env
 pnpm install
 pnpm dev
 ```
 
-Local ports are configured in `.env`. The example configuration uses port `3000` for the web app and `3001` for the API.
+Local development works without an `.env` file. Defaults are defined in `.env.defaults`: the web app runs on port `3000` and the API on port `3001`.
+
+To override the defaults, copy `.env.example` to `.env` and change the values as needed.
 
 ## Workspace
 
