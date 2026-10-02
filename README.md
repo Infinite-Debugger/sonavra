@@ -10,11 +10,12 @@ Sonavra is a transcription workspace for turning audio and video into searchable
 ## Setup
 
 ```sh
+cp .env.example .env
 pnpm install
 pnpm dev
 ```
 
-The web app runs on `http://localhost:3000`, the API on `http://localhost:3001`, and the worker runs as a separate process.
+Local ports are configured in `.env`. The example configuration uses port `3000` for the web app and `3001` for the API.
 
 ## Workspace
 

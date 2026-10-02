@@ -2,9 +2,9 @@
   "name": "@sonavra/web",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port $WEB_PORT",
     "build": "next build",
-    "start": "next start",
+    "start": "next start --port $WEB_PORT",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
