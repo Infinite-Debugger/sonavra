@@ -3,4 +3,6 @@ import type { TranscriptionProvider } from '@sonavra/transcription';
 
 const provider: TranscriptionProvider | undefined = undefined;
 
-console.log(`${serviceName} worker ready`, { providerConfigured: Boolean(provider) });
+console.log(`${serviceName} worker ready`, {
+  providerConfigured: Boolean(provider),
+});
