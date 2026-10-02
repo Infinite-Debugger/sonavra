@@ -5,19 +5,17 @@
   "type": "module",
   "exports": "./src/index.ts",
   "scripts": {
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/migrate.ts",
-    "db:studio": "drizzle-kit studio",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "drizzle-orm": "^0.44.5",
-    "postgres": "^3.4.7"
+    "@prisma/client": "^6.16.3"
   },
   "devDependencies": {
-    "@types/node": "^24.5.2",
-    "drizzle-kit": "^0.31.4",
-    "tsx": "^4.20.5",
+    "prisma": "^6.16.3",
     "typescript": "^5.9.2"
   }
 }
