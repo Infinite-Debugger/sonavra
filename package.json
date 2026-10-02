@@ -6,7 +6,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "dotenv -e .env -e .env.defaults -- pnpm --parallel --filter './apps/*' dev",
+    "dev": "pnpm dev:setup && dotenv -e .env -e .env.defaults -- pnpm --parallel --filter './apps/*' dev",
+    "dev:setup": "docker compose up -d --wait postgres && pnpm db:deploy && pnpm db:generate",
     "dev:web": "dotenv -e .env -e .env.defaults -- pnpm --filter @sonavra/web dev",
     "dev:api": "dotenv -e .env -e .env.defaults -- pnpm --filter @sonavra/api dev",
     "dev:worker": "dotenv -e .env -e .env.defaults -- pnpm --filter @sonavra/worker dev",
