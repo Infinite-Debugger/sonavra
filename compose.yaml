@@ -6,11 +6,15 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-sonavra}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sonavra}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - '${POSTGRES_PORT:-5432}:5432'
     volumes:
       - sonavra-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sonavra} -d ${POSTGRES_DB:-sonavra}"]
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-sonavra} -d ${POSTGRES_DB:-sonavra}',
+        ]
       interval: 5s
       timeout: 5s
       retries: 5
