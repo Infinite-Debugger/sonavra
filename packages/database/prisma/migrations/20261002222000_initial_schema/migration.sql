@@ -41,7 +41,8 @@ CREATE TABLE "Recording" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "Recording_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Recording_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "Recording_owner_check" CHECK ((("userId" IS NOT NULL)::int + ("guestSessionId" IS NOT NULL)::int) = 1)
 );
 
 -- CreateTable
@@ -96,7 +97,8 @@ CREATE TABLE "TranscriptSegment" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "TranscriptSegment_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "TranscriptSegment_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "TranscriptSegment_timing_check" CHECK ("startMs" >= 0 AND "endMs" >= "startMs")
 );
 
 -- CreateIndex
