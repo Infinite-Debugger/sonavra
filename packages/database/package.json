@@ -9,6 +9,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
+    "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
