@@ -14,6 +14,11 @@ export interface PresignedDownload {
   expiresAt: Date;
 }
 
+export interface StoredObjectMetadata {
+  contentLength: number;
+  contentType: string | null;
+}
+
 export interface ObjectStorage {
   createObjectKey(): string;
   presignUpload(
@@ -24,6 +29,7 @@ export interface ObjectStorage {
     key: string,
     expiresInSeconds?: number,
   ): Promise<PresignedDownload>;
+  statObject(key: string): Promise<StoredObjectMetadata | null>;
   deleteObject(key: string): Promise<void>;
 }
 
@@ -144,6 +150,23 @@ export class S3ObjectStorage implements ObjectStorage {
     };
   }
 
+  async statObject(key: string) {
+    this.validateKey(key);
+    const { url } = this.presign('HEAD', key, 60, {}, this.endpoint);
+    const response = await fetch(url, { method: 'HEAD' });
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      throw new Error(
+        `S3 object metadata failed with status ${response.status}`,
+      );
+    }
+    const contentLength = Number(response.headers.get('content-length'));
+    if (!Number.isSafeInteger(contentLength) || contentLength < 0) {
+      throw new Error('S3 object metadata returned an invalid content length');
+    }
+    return { contentLength, contentType: response.headers.get('content-type') };
+  }
+
   async ensureBucket() {
     const { url } = this.presign('PUT', undefined, 60, {}, this.endpoint);
     const response = await fetch(url, { method: 'PUT' });
@@ -168,7 +191,7 @@ export class S3ObjectStorage implements ObjectStorage {
   }
 
   private presign(
-    method: 'GET' | 'PUT' | 'DELETE',
+    method: 'GET' | 'PUT' | 'DELETE' | 'HEAD',
     key: string | undefined,
     expiresInSeconds: number,
     headers: Record<string, string> = {},

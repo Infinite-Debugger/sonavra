@@ -5,7 +5,8 @@
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test src/*.test.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.2",
@@ -13,7 +14,10 @@
     "@nestjs/platform-express": "^12.1.2",
     "@sonavra/config": "workspace:*",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.2"
+    "rxjs": "^7.8.2",
+    "@sonavra/database": "workspace:*",
+    "@sonavra/storage": "workspace:*",
+    "@sonavra/types": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",
