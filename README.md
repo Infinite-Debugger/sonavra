@@ -15,11 +15,11 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm dev` prepares the local development environment before starting the applications. It starts PostgreSQL, waits for it to become healthy, applies committed Prisma migrations, generates the Prisma client, and then starts the web, API, and worker processes.
+`pnpm dev` prepares the local development environment before starting the applications. It starts PostgreSQL and the private S3-compatible object store (SeaweedFS), waits for them to become healthy, creates the local storage bucket, applies committed Prisma migrations, generates the Prisma client, and then starts the web, API, and worker processes.
 
-Local development works without an `.env` file. Defaults are defined in `.env.defaults`: the web app runs on port `3000`, the API on port `3001`, and PostgreSQL on port `5432`.
+Local development works without an `.env` file. Defaults are defined in `.env.defaults`: the web app runs on port `3000`, the API on port `3001`, PostgreSQL on port `5432`, and the local S3 endpoint on port `9000`.
 
-To override the defaults, copy `.env.example` to `.env` and change the values as needed.
+To override the defaults, copy `.env.example` to `.env` and change the values as needed. `S3_ENDPOINT` is the server-side S3-compatible endpoint; `S3_PUBLIC_ENDPOINT` is the endpoint placed in browser-facing presigned URLs. Objects are private by default; local storage requires the configured S3 credentials and integration tests verify anonymous reads are rejected.
 
 Prisma owns the database schema and migrations in `packages/database/prisma`. After intentionally changing `schema.prisma`, create a new development migration with `pnpm db:migrate`. Normal startup uses `prisma migrate deploy`, so it applies existing migrations without silently creating new ones.
 
@@ -31,12 +31,13 @@ Prisma owns the database schema and migrations in `packages/database/prisma`. Af
 - `packages/config` - shared configuration contracts
 - `packages/types` - shared domain types
 - `packages/database` - Prisma database client, schema, and migrations
-- `packages/storage` - object storage boundary
+- `packages/storage` - S3-compatible private object storage and presigning
 - `packages/transcription` - transcription provider boundary
 
 ## Root commands
 
 ```sh
+pnpm test
 pnpm build
 pnpm typecheck
 pnpm lint
