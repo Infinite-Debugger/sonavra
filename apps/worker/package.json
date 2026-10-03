@@ -5,10 +5,13 @@
     "dev": "tsx watch src/main.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
+    "test": "tsx --test src/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@sonavra/config": "workspace:*",
+    "@sonavra/database": "workspace:*",
+    "@sonavra/storage": "workspace:*",
     "@sonavra/transcription": "workspace:*"
   },
   "devDependencies": {
