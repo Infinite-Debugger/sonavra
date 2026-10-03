@@ -6,6 +6,7 @@ Sonavra is a transcription workspace for turning audio and video into searchable
 
 - Node.js 22 or newer
 - pnpm 10
+- Docker with Docker Compose
 
 ## Setup
 
@@ -14,9 +15,11 @@ pnpm install
 pnpm dev
 ```
 
-Local development works without an `.env` file. Defaults are defined in `.env.defaults`: the web app runs on port `3000` and the API on port `3001`.
+`pnpm dev` starts PostgreSQL, waits until it is healthy, applies all committed migrations, then starts the web, API and worker. Pulling database changes does not require a separate setup command.
 
-To override the defaults, copy `.env.example` to `.env` and change the values as needed.
+Local development works without an `.env` file. Defaults are defined in `.env.defaults`: web `3000`, API `3001`, PostgreSQL `5432`.
+
+To override defaults, copy `.env.example` to `.env`.
 
 ## Workspace
 
@@ -25,9 +28,9 @@ To override the defaults, copy `.env.example` to `.env` and change the values as
 - `apps/worker` - background worker process
 - `packages/config` - shared configuration contracts
 - `packages/types` - shared domain types
-- `packages/database` - database boundary
+- `packages/database` - PostgreSQL schema, migrations and client
 - `packages/storage` - object storage boundary
-- `packages/transcription` - transcription provider boundary
+- `packages/transcription` - transcription engine boundary
 
 ## Root commands
 

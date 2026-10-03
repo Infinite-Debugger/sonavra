@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: sonavra
+      POSTGRES_USER: sonavra
+      POSTGRES_PASSWORD: sonavra
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sonavra -d sonavra']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - sonavra-postgres:/var/lib/postgresql/data
+volumes:
+  sonavra-postgres:
