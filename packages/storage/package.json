@@ -5,9 +5,13 @@
   "type": "module",
   "exports": "./src/index.ts",
   "scripts": {
+    "setup": "tsx src/setup.ts",
+    "test": "tsx --test src/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@types/node": "^24.5.2",
+    "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }
 }

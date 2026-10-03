@@ -7,10 +7,11 @@
   },
   "scripts": {
     "dev": "pnpm dev:setup && dotenv -e .env -e .env.defaults -- pnpm --parallel --filter './apps/*' dev",
-    "dev:setup": "docker compose up -d --wait postgres && pnpm db:deploy && pnpm db:generate",
+    "dev:setup": "docker compose up -d --wait postgres object-storage && pnpm storage:setup && pnpm db:deploy && pnpm db:generate",
     "dev:web": "dotenv -e .env -e .env.defaults -- pnpm --filter @sonavra/web dev",
     "dev:api": "dotenv -e .env -e .env.defaults -- pnpm --filter @sonavra/api dev",
     "dev:worker": "dotenv -e .env -e .env.defaults -- pnpm --filter @sonavra/worker dev",
+    "storage:setup": "dotenv -e .env -e .env.defaults -- pnpm --filter @sonavra/storage run setup",
     "db:generate": "dotenv -e .env -e .env.defaults -- pnpm --filter @sonavra/database db:generate",
     "db:migrate": "dotenv -e .env -e .env.defaults -- pnpm --filter @sonavra/database db:migrate",
     "db:deploy": "dotenv -e .env -e .env.defaults -- pnpm --filter @sonavra/database db:deploy",
