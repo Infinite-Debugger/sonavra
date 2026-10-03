@@ -1,0 +1,15 @@
+services:
+  transcription-runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    environment:
+      SONAVRA_TRANSCRIPTION_DEVICE: cuda
+      SONAVRA_TRANSCRIPTION_COMPUTE_TYPE: float16
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

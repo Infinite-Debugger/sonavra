@@ -1,0 +1,14 @@
+services:
+  transcription-runtime:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      SONAVRA_MODEL_CACHE: /models/whisper
+      SONAVRA_DIARIZATION_MODEL: /models/diarization
+    volumes:
+      - sonavra-models:/models
+    command: ['python', 'runtime_check.py']
+
+volumes:
+  sonavra-models:
