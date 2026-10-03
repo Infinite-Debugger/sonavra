@@ -16,6 +16,7 @@
     "db:deploy": "dotenv -e .env -e .env.defaults -- pnpm --filter @sonavra/database db:deploy",
     "db:studio": "dotenv -e .env -e .env.defaults -- pnpm --filter @sonavra/database db:studio",
     "build": "pnpm -r --if-present build",
+    "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "eslint .",
     "format": "prettier --write .",
