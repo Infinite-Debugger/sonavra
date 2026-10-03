@@ -4,9 +4,10 @@ export {
   type TranscriptionErrorCode,
 } from './errors.js';
 export {
-  FasterWhisperEngine,
-  type FasterWhisperEngineOptions,
-} from './faster-whisper.js';
+  MediaPreprocessor,
+  type MediaPreprocessorOptions,
+  type NormalizedMedia,
+} from './media-preprocessor.js';
 export type {
   TranscriptSegment,
   TranscriptSpeaker,
