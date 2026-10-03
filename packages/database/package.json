@@ -5,9 +5,19 @@
   "type": "module",
   "exports": "./src/index.ts",
   "scripts": {
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@prisma/client": "^6.16.3"
+  },
   "devDependencies": {
+    "@types/node": "^24.5.2",
+    "prisma": "^6.16.3",
     "typescript": "^5.9.2"
   }
 }

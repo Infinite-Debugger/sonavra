@@ -17,9 +17,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: sonavra
+          POSTGRES_USER: sonavra
+          POSTGRES_PASSWORD: sonavra
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sonavra -d sonavra"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://sonavra:sonavra@localhost:5432/sonavra
+
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Enable Corepack
         run: corepack enable
@@ -32,6 +52,12 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Apply database migrations
+        run: pnpm db:deploy
 
       - name: Build
         run: pnpm build

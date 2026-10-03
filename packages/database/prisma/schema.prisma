@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RecordingStatus {
+  UPLOADED
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum TranscriptionJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id         String      @id @default(uuid()) @db.Uuid
+  email      String      @unique
+  recordings Recording[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+model GuestSession {
+  id         String      @id @default(uuid()) @db.Uuid
+  recordings Recording[]
+  expiresAt  DateTime
+  createdAt  DateTime    @default(now())
+
+  @@index([expiresAt])
+}
+
+model Recording {
+  id                String             @id @default(uuid()) @db.Uuid
+  userId            String?            @db.Uuid
+  guestSessionId    String?            @db.Uuid
+  user              User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestSession      GuestSession?      @relation(fields: [guestSessionId], references: [id], onDelete: Cascade)
+  originalFilename  String
+  objectKey         String
+  mimeType          String
+  sizeBytes         BigInt
+  durationMs        Int?
+  status            RecordingStatus    @default(UPLOADED)
+  expiresAt         DateTime?
+  transcriptionJobs TranscriptionJob[]
+  transcript        Transcript?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([guestSessionId])
+  @@index([expiresAt])
+}
+
+model TranscriptionJob {
+  id            String                 @id @default(uuid()) @db.Uuid
+  recordingId   String                 @db.Uuid
+  recording     Recording              @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+  status        TranscriptionJobStatus @default(QUEUED)
+  provider      String?
+  providerJobId String?
+  errorCode     String?
+  attemptCount  Int                    @default(0)
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  @@index([recordingId])
+}
+
+model Transcript {
+  id          String              @id @default(uuid()) @db.Uuid
+  recordingId String              @unique @db.Uuid
+  recording   Recording           @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+  language    String?
+  title       String?
+  speakers    Speaker[]
+  segments    TranscriptSegment[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+model Speaker {
+  id           String              @id @default(uuid()) @db.Uuid
+  transcriptId String              @db.Uuid
+  transcript   Transcript          @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+  label        String
+  displayName  String?
+  segments     TranscriptSegment[]
+  createdAt    DateTime            @default(now())
+
+  @@index([transcriptId])
+}
+
+model TranscriptSegment {
+  id           String      @id @default(uuid()) @db.Uuid
+  transcriptId String      @db.Uuid
+  speakerId    String?     @db.Uuid
+  transcript   Transcript  @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+  speaker      Speaker?    @relation(fields: [speakerId], references: [id], onDelete: SetNull)
+  sequence     Int
+  startMs      Int
+  endMs        Int
+  text         String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([transcriptId, sequence])
+  @@index([speakerId])
+}
