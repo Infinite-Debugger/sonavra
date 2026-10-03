@@ -1,8 +1,8 @@
 import { serviceName } from '@sonavra/config';
-import type { TranscriptionProvider } from '@sonavra/transcription';
+import type { TranscriptionEngine } from '@sonavra/transcription';
 
-const provider: TranscriptionProvider | undefined = undefined;
+const engine: TranscriptionEngine | undefined = undefined;
 
 console.log(`${serviceName} worker ready`, {
-  providerConfigured: Boolean(provider),
+  engineConfigured: Boolean(engine),
 });

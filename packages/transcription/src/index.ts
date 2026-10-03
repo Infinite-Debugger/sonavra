@@ -1,18 +1,13 @@
-export interface TranscriptionInput {
-  objectKey: string;
-}
-
-export interface TranscriptSegment {
-  start: number;
-  end: number;
-  text: string;
-  speaker?: string;
-}
-
-export interface Transcript {
-  segments: TranscriptSegment[];
-}
-
-export interface TranscriptionProvider {
-  transcribe(input: TranscriptionInput): Promise<Transcript>;
-}
+export {
+  TranscriptionEngineError,
+  type TranscriptionEngineErrorOptions,
+  type TranscriptionErrorCode,
+} from './errors.js';
+export type {
+  TranscriptSegment,
+  TranscriptSpeaker,
+  TranscriptionEngine,
+  TranscriptionRequest,
+  TranscriptionResult,
+  TranscriptionSource,
+} from './types.js';
