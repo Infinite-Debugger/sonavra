@@ -44,6 +44,9 @@ importers:
       '@sonavra/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@sonavra/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -94,6 +97,12 @@ importers:
       '@sonavra/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@sonavra/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@sonavra/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@sonavra/transcription':
         specifier: workspace:*
         version: link:../../packages/transcription

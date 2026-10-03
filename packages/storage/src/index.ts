@@ -24,6 +24,7 @@ export interface ObjectStorage {
     key: string,
     expiresInSeconds?: number,
   ): Promise<PresignedDownload>;
+  downloadObject(key: string): Promise<Response>;
   deleteObject(key: string): Promise<void>;
 }
 
@@ -142,6 +143,16 @@ export class S3ObjectStorage implements ObjectStorage {
       method: 'GET' as const,
       expiresAt: signed.expiresAt,
     };
+  }
+
+  async downloadObject(key: string) {
+    this.validateKey(key);
+    const { url } = this.presign('GET', key, 60, {}, this.endpoint);
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`S3 download failed with status ${response.status}`);
+    }
+    return response;
   }
 
   async ensureBucket() {
