@@ -1,7 +1,10 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import type { CompleteUploadResponse, CreateUploadResponse } from '@sonavra/types';
+import type {
+  CompleteUploadResponse,
+  CreateUploadResponse,
+} from '@sonavra/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
@@ -21,7 +24,9 @@ const ACCEPTED_TYPES = [
 type UploadState = 'idle' | 'uploading' | 'complete' | 'error';
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : 'Upload failed. Please try again.';
+  return error instanceof Error
+    ? error.message
+    : 'Upload failed. Please try again.';
 }
 
 async function apiJson<T>(path: string, init: RequestInit) {
@@ -52,7 +57,10 @@ function putWithProgress(
     });
     request.addEventListener('load', () => {
       if (request.status >= 200 && request.status < 300) resolve();
-      else reject(new Error(`Object upload failed with status ${request.status}.`));
+      else
+        reject(
+          new Error(`Object upload failed with status ${request.status}.`),
+        );
     });
     request.addEventListener('error', () =>
       reject(new Error('Could not reach object storage.')),
@@ -128,8 +136,8 @@ export default function Home() {
           Turn recordings into transcripts.
         </h1>
         <p className="mx-auto mt-6 mb-9 max-w-2xl text-base leading-7 text-zinc-600 sm:text-lg dark:text-zinc-400">
-          Drop in audio or video. Sonavra keeps your source private and prepares it
-          for self-hosted transcription.
+          Drop in audio or video. Sonavra keeps your source private and prepares
+          it for self-hosted transcription.
         </p>
 
         <div

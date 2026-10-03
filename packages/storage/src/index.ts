@@ -156,7 +156,9 @@ export class S3ObjectStorage implements ObjectStorage {
     const response = await fetch(url, { method: 'HEAD' });
     if (response.status === 404) return null;
     if (!response.ok) {
-      throw new Error(`S3 object metadata failed with status ${response.status}`);
+      throw new Error(
+        `S3 object metadata failed with status ${response.status}`,
+      );
     }
     const contentLength = Number(response.headers.get('content-length'));
     if (!Number.isSafeInteger(contentLength) || contentLength < 0) {

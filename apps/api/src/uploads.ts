@@ -43,7 +43,9 @@ export function validateUploadInput(input: CreateUploadRequest) {
     throw new UploadValidationError('The selected file is empty or invalid.');
   }
   if (sizeBytes > MAX_UPLOAD_BYTES) {
-    throw new UploadValidationError('The selected file exceeds the 500 MB limit.');
+    throw new UploadValidationError(
+      'The selected file exceeds the 500 MB limit.',
+    );
   }
 
   return { filename, mimeType, sizeBytes };
@@ -55,7 +57,9 @@ export class UploadService {
     private readonly storage: ObjectStorage = createS3ObjectStorageFromEnv(),
   ) {}
 
-  async createUpload(input: CreateUploadRequest): Promise<CreateUploadResponse> {
+  async createUpload(
+    input: CreateUploadRequest,
+  ): Promise<CreateUploadResponse> {
     const media = validateUploadInput(input);
     const expiresAt = new Date(Date.now() + GUEST_RETENTION_MS);
     const guest = input.guestSessionId
