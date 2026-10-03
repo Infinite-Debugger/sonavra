@@ -1,0 +1,59 @@
+name: Transcription Runtime
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  real-model-smoke:
+    name: Real model smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: packages/transcription/runtime/requirements.txt
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install runtime
+        run: python -m pip install -r packages/transcription/runtime/requirements.txt
+
+      - name: Generate local speech fixture
+        run: |
+          sudo apt-get install -y espeak-ng
+          espeak-ng -w /tmp/sonavra-smoke.wav 'Sonavra transcribes this recording locally.'
+
+      - name: Transcribe with no hosted credentials
+        env:
+          OPENAI_API_KEY: ''
+          DEEPGRAM_API_KEY: ''
+          ASSEMBLYAI_API_KEY: ''
+          PYANNOTEAI_API_KEY: ''
+        run: |
+          python packages/transcription/runtime/whisper_runtime.py \
+            --model tiny \
+            --device cpu \
+            --compute-type int8 \
+            --detect-language \
+            /tmp/sonavra-smoke.wav > /tmp/result.json
+          python - <<'PY'
+          import json
+          result = json.load(open('/tmp/result.json'))
+          assert result['engine'] == 'faster-whisper'
+          assert result['segments']
+          assert result['segments'][0]['endMs'] > result['segments'][0]['startMs']
+          assert result['language']
+          PY
