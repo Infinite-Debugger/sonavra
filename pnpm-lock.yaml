@@ -141,6 +141,9 @@ importers:
 
   packages/transcription:
     devDependencies:
+      '@types/node':
+        specifier: ^24.5.2
+        version: 24.19.1
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
