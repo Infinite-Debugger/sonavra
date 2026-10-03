@@ -15,6 +15,9 @@ export interface FasterWhisperEngineOptions {
   modelCache?: string;
   device?: 'cpu' | 'cuda';
   computeType?: string;
+  diarizationModel?: string;
+  minSpeakers?: number;
+  maxSpeakers?: number;
 }
 
 export class FasterWhisperEngine implements TranscriptionEngine {
@@ -26,6 +29,9 @@ export class FasterWhisperEngine implements TranscriptionEngine {
   private readonly modelCache?: string;
   private readonly device: 'cpu' | 'cuda';
   private readonly computeType: string;
+  private readonly diarizationModel?: string;
+  private readonly minSpeakers?: number;
+  private readonly maxSpeakers?: number;
 
   constructor(options: FasterWhisperEngineOptions = {}) {
     this.pythonExecutable = options.pythonExecutable ?? 'python3';
@@ -37,6 +43,9 @@ export class FasterWhisperEngine implements TranscriptionEngine {
     this.device = options.device ?? 'cpu';
     this.computeType =
       options.computeType ?? (this.device === 'cpu' ? 'int8' : 'float16');
+    this.diarizationModel = options.diarizationModel;
+    this.minSpeakers = options.minSpeakers;
+    this.maxSpeakers = options.maxSpeakers;
   }
 
   async transcribe(
@@ -46,6 +55,13 @@ export class FasterWhisperEngine implements TranscriptionEngine {
       throw new TranscriptionEngineError(
         'The self-hosted Whisper engine requires a local media file.',
         { code: 'invalid_request', retryable: false, engine: this.name },
+      );
+    }
+
+    if (request.diarization && !this.diarizationModel) {
+      throw new TranscriptionEngineError(
+        'Speaker diarization was requested but no local diarization model is configured.',
+        { code: 'model_unavailable', retryable: false, engine: this.name },
       );
     }
 
@@ -62,8 +78,16 @@ export class FasterWhisperEngine implements TranscriptionEngine {
     if (this.modelCache) args.push('--model-cache', this.modelCache);
     if (request.language) args.push('--language', request.language);
     if (request.detectLanguage) args.push('--detect-language');
-    args.push(request.source.path);
 
+    if (request.diarization && this.diarizationModel) {
+      args.push('--diarization-model', this.diarizationModel);
+      if (this.minSpeakers !== undefined)
+        args.push('--min-speakers', String(this.minSpeakers));
+      if (this.maxSpeakers !== undefined)
+        args.push('--max-speakers', String(this.maxSpeakers));
+    }
+
+    args.push(request.source.path);
     return this.run(args);
   }
 
@@ -87,7 +111,7 @@ export class FasterWhisperEngine implements TranscriptionEngine {
       child.on('error', (cause) => {
         reject(
           new TranscriptionEngineError(
-            'Unable to start the self-hosted Whisper runtime.',
+            'Unable to start the self-hosted transcription runtime.',
             {
               code: 'runtime_unavailable',
               retryable: false,
@@ -103,7 +127,7 @@ export class FasterWhisperEngine implements TranscriptionEngine {
           reject(
             new TranscriptionEngineError(
               stderr.trim() ||
-                `Whisper runtime exited with code ${code ?? 'unknown'}.`,
+                `Transcription runtime exited with code ${code ?? 'unknown'}.`,
               {
                 code: 'transcription_failed',
                 retryable: true,
@@ -119,7 +143,7 @@ export class FasterWhisperEngine implements TranscriptionEngine {
         } catch (cause) {
           reject(
             new TranscriptionEngineError(
-              'Whisper runtime returned invalid JSON.',
+              'Transcription runtime returned invalid JSON.',
               {
                 code: 'invalid_response',
                 retryable: false,
