@@ -267,12 +267,6 @@ export default function RecordingPage() {
   }
 
   if (transcript) {
-    const speakers = new Map(
-      transcript.speakers.map((speaker) => [
-        speaker.id,
-        speaker.displayName ?? speaker.label,
-      ]),
-    );
     const isVideo = transcript.media.mimeType.startsWith('video/');
 
     return (
