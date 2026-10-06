@@ -47,17 +47,17 @@ export interface TranscriptResponse {
   filename: string;
   language: string | null;
   durationMs: number | null;
-  speakers: {
+  speakers: Array<{
     id: string;
     label: string;
     displayName: string | null;
-  }[];
-  segments: {
+  }>;
+  segments: Array<{
     id: string;
     sequence: number;
     startMs: number;
     endMs: number;
     text: string;
     speakerId: string | null;
-  }[];
+  }>;
 }

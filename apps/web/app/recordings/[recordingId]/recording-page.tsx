@@ -51,9 +51,17 @@ export default function RecordingPage() {
           if (!stopped) setTranscript(result);
           return;
         }
-        if (next.status !== 'FAILED') timer = setTimeout(poll, 1500);
+        if (next.status !== 'FAILED') {
+          timer = setTimeout(poll, 1500);
+        }
       } catch (cause) {
-        if (!stopped) setError(cause instanceof Error ? cause.message : 'Unable to load this recording.');
+        if (!stopped) {
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : 'Unable to load this recording.',
+          );
+        }
       }
     }
 
@@ -69,16 +77,25 @@ export default function RecordingPage() {
     if (!guestSessionId) return;
     setRetrying(true);
     try {
-      const response = await fetch(`/api/recordings/${recordingId}/transcription-jobs`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ guestSessionId }),
-      });
+      const response = await fetch(
+        `/api/recordings/${recordingId}/transcription-jobs`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ guestSessionId }),
+        },
+      );
       if (!response.ok) throw new Error('Unable to retry transcription.');
-      setStatus((current) => current ? { ...current, status: 'QUEUED', errorMessage: null } : current);
+      setStatus((current) =>
+        current ? { ...current, status: 'QUEUED', errorMessage: null } : current,
+      );
       window.location.reload();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Unable to retry transcription.');
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'Unable to retry transcription.',
+      );
     } finally {
       setRetrying(false);
     }
@@ -104,7 +121,9 @@ export default function RecordingPage() {
     return (
       <main className="min-h-screen bg-white px-5 py-12 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
         <article className="mx-auto max-w-3xl">
-          <p className="mb-3 text-xs font-extrabold tracking-[0.24em] text-zinc-500 dark:text-zinc-400">SONAVRA</p>
+          <p className="mb-3 text-xs font-extrabold tracking-[0.24em] text-zinc-500 dark:text-zinc-400">
+            SONAVRA
+          </p>
           <h1 className="truncate text-3xl font-bold tracking-tight sm:text-4xl">
             {transcript.filename}
           </h1>
@@ -116,11 +135,16 @@ export default function RecordingPage() {
           </p>
           <div className="mt-10 space-y-7">
             {transcript.segments.map((segment) => (
-              <section key={segment.id} className="grid gap-2 sm:grid-cols-[7rem_1fr]">
+              <section
+                key={segment.id}
+                className="grid gap-2 sm:grid-cols-[7rem_1fr]"
+              >
                 <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                  <strong className="block text-zinc-800 dark:text-zinc-200">{segment.speakerId
+                  <strong className="block text-zinc-800 dark:text-zinc-200">
+                    {segment.speakerId
                       ? speakers.get(segment.speakerId)
-                      : 'Speaker'}</strong>
+                      : 'Speaker'}
+                  </strong>
                   {formatTime(segment.startMs)}
                 </div>
                 <p className="leading-7">{segment.text}</p>
@@ -136,7 +160,9 @@ export default function RecordingPage() {
   return (
     <main className="grid min-h-screen place-items-center bg-white px-5 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
       <section className="w-full max-w-md text-center">
-        <p className="mb-4 text-xs font-extrabold tracking-[0.24em] text-zinc-500 dark:text-zinc-400">SONAVRA</p>
+        <p className="mb-4 text-xs font-extrabold tracking-[0.24em] text-zinc-500 dark:text-zinc-400">
+          SONAVRA
+        </p>
         <h1 className="text-3xl font-bold">
           {failed
             ? 'Transcription failed'
@@ -146,7 +172,8 @@ export default function RecordingPage() {
         </h1>
         <p className="mt-4 leading-7 text-zinc-600 dark:text-zinc-400">
           {failed
-            ? (status?.errorMessage ?? 'The transcription could not be completed.')
+            ? (status?.errorMessage ??
+              'The transcription could not be completed.')
             : 'You can leave this page open. Sonavra will show the transcript here when it is ready.'}
         </p>
         {!failed && (

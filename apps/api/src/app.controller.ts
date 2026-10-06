@@ -64,6 +64,7 @@ export class AppController {
       where: { id: recordingId, guestSessionId },
       include: { transcriptionJobs: { orderBy: { createdAt: 'desc' }, take: 1 } },
     });
+
     if (!recording) throw new NotFoundException('Recording not found');
     const job = recording.transcriptionJobs[0];
     return {
