@@ -42,6 +42,11 @@ export interface TranscriptResponse {
   filename: string;
   language: string | null;
   durationMs: number | null;
+  media: {
+    url: string;
+    mimeType: string;
+    expiresAt: string;
+  };
   speakers: Array<{
     id: string;
     label: string;
