@@ -112,6 +112,12 @@ importers:
       '@sonavra/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@sonavra/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@sonavra/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@sonavra/transcription':
         specifier: workspace:*
         version: link:../../packages/transcription

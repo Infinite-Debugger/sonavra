@@ -30,6 +30,7 @@ export interface ObjectStorage {
     expiresInSeconds?: number,
   ): Promise<PresignedDownload>;
   statObject(key: string): Promise<StoredObjectMetadata | null>;
+  downloadObject(key: string): Promise<Response>;
   deleteObject(key: string): Promise<void>;
 }
 
@@ -165,6 +166,16 @@ export class S3ObjectStorage implements ObjectStorage {
       throw new Error('S3 object metadata returned an invalid content length');
     }
     return { contentLength, contentType: response.headers.get('content-type') };
+  }
+
+  async downloadObject(key: string) {
+    this.validateKey(key);
+    const { url } = this.presign('GET', key, 60, {}, this.endpoint);
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`S3 download failed with status ${response.status}`);
+    }
+    return response;
   }
 
   async ensureBucket() {
