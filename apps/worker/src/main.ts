@@ -19,7 +19,7 @@ const engine = new DockerFasterWhisperEngine({
   model: process.env.SONAVRA_TRANSCRIPTION_MODEL,
   device: process.env.SONAVRA_TRANSCRIPTION_DEVICE === 'cuda' ? 'cuda' : 'cpu',
   computeType: process.env.SONAVRA_TRANSCRIPTION_COMPUTE_TYPE,
-  diarizationModel: '/models/diarization',
+  diarizationModel: process.env.SONAVRA_DIARIZATION_MODEL,
 });
 const processor = new TranscriptionJobProcessor(
   database,
