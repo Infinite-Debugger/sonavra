@@ -70,13 +70,19 @@ model TranscriptionJob {
   provider      String?
   providerJobId String?
   errorCode     String?
+  errorMessage  String?
+  retryable     Boolean                @default(false)
   attemptCount  Int                    @default(0)
+  availableAt   DateTime               @default(now())
+  leaseExpiresAt DateTime?
   startedAt     DateTime?
   completedAt   DateTime?
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
 
   @@index([recordingId])
+  @@index([status, availableAt])
+  @@index([status, leaseExpiresAt])
 }
 
 model Transcript {
