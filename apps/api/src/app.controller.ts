@@ -134,7 +134,9 @@ export class AppController {
     @Param('recordingId') recordingId: string,
     @Body() body: { guestSessionId?: string },
   ) {
-    if (!body.guestSessionId) throw new NotFoundException('Recording not found');
+    if (!body.guestSessionId) {
+      throw new NotFoundException('Recording not found');
+    }
     const recording = await database.recording.findFirst({
       where: { id: recordingId, guestSessionId: body.guestSessionId },
       select: { id: true },
