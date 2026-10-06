@@ -3,7 +3,10 @@ import type { ReactNode } from 'react';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Sonavra | Private self-hosted transcription',
+  title: {
+    default: 'Sonavra · Private self-hosted transcription',
+    template: '%s · Sonavra',
+  },
   description:
     'Turn audio and video recordings into private, self-hosted transcripts.',
 };
