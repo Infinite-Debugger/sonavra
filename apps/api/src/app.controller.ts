@@ -7,6 +7,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
 } from '@nestjs/common';
 import type {
   CompleteUploadRequest,
@@ -57,10 +58,10 @@ export class AppController {
   @Get('recordings/:recordingId/status')
   async recordingStatus(
     @Param('recordingId') recordingId: string,
-    @Body() body: { guestSessionId?: string },
+    @Query('guestSessionId') guestSessionId: string,
   ): Promise<RecordingStatusResponse> {
     const recording = await database.recording.findFirst({
-      where: { id: recordingId, guestSessionId: body.guestSessionId },
+      where: { id: recordingId, guestSessionId },
       include: { transcriptionJobs: { orderBy: { createdAt: 'desc' }, take: 1 } },
     });
     if (!recording) throw new NotFoundException('Recording not found');
@@ -77,10 +78,10 @@ export class AppController {
   @Get('recordings/:recordingId/transcript')
   async transcript(
     @Param('recordingId') recordingId: string,
-    @Body() body: { guestSessionId?: string },
+    @Query('guestSessionId') guestSessionId: string,
   ): Promise<TranscriptResponse> {
     const recording = await database.recording.findFirst({
-      where: { id: recordingId, guestSessionId: body.guestSessionId },
+      where: { id: recordingId, guestSessionId }
       include: {
         transcript: {
           include: {
