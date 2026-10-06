@@ -81,7 +81,7 @@ export class AppController {
     @Query('guestSessionId') guestSessionId: string,
   ): Promise<TranscriptResponse> {
     const recording = await database.recording.findFirst({
-      where: { id: recordingId, guestSessionId }
+      where: { id: recordingId, guestSessionId },
       include: {
         transcript: {
           include: {
