@@ -16,10 +16,12 @@ import type {
   TranscriptResponse,
 } from '@sonavra/types';
 import { createDatabase } from '@sonavra/database';
+import { createS3ObjectStorageFromEnv } from '@sonavra/storage';
 import { UploadService, UploadValidationError } from './uploads.js';
 
 const uploads = new UploadService();
 const database = createDatabase();
+const storage = createS3ObjectStorageFromEnv();
 
 @Controller()
 export class AppController {
@@ -60,6 +62,7 @@ export class AppController {
     @Param('recordingId') recordingId: string,
     @Query('guestSessionId') guestSessionId: string,
   ): Promise<RecordingStatusResponse> {
+    if (!guestSessionId) throw new NotFoundException('Recording not found');
     const recording = await database.recording.findFirst({
       where: { id: recordingId, guestSessionId },
       include: {
@@ -83,6 +86,7 @@ export class AppController {
     @Param('recordingId') recordingId: string,
     @Query('guestSessionId') guestSessionId: string,
   ): Promise<TranscriptResponse> {
+    if (!guestSessionId) throw new NotFoundException('Transcript not found');
     const recording = await database.recording.findFirst({
       where: { id: recordingId, guestSessionId },
       include: {
@@ -97,11 +101,17 @@ export class AppController {
     if (!recording || !recording.transcript) {
       throw new NotFoundException('Transcript not found');
     }
+    const media = await storage.presignDownload(recording.objectKey, 60 * 60);
     return {
       recordingId,
       filename: recording.originalFilename,
       language: recording.transcript.language,
       durationMs: recording.durationMs,
+      media: {
+        url: media.url,
+        mimeType: recording.mimeType,
+        expiresAt: media.expiresAt.toISOString(),
+      },
       speakers: recording.transcript.speakers.map((speaker) => ({
         id: speaker.id,
         label: speaker.label,
@@ -124,6 +134,9 @@ export class AppController {
     @Param('recordingId') recordingId: string,
     @Body() body: { guestSessionId?: string },
   ) {
+    if (!body.guestSessionId) {
+      throw new NotFoundException('Recording not found');
+    }
     const recording = await database.recording.findFirst({
       where: { id: recordingId, guestSessionId: body.guestSessionId },
       select: { id: true },
