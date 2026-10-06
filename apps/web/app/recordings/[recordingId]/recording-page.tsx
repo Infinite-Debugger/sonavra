@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import type { RecordingStatusResponse, TranscriptResponse } from '@sonavra/types';
+import type {
+  RecordingStatusResponse,
+  TranscriptResponse,
+} from '@sonavra/types';
 
 async function getJson<T>(path: string, guestSessionId: string) {
   const response = await fetch(
@@ -87,7 +90,9 @@ export default function RecordingPage() {
       );
       if (!response.ok) throw new Error('Unable to retry transcription.');
       setStatus((current) =>
-        current ? { ...current, status: 'QUEUED', errorMessage: null } : current,
+        current
+          ? { ...current, status: 'QUEUED', errorMessage: null }
+          : current,
       );
       window.location.reload();
     } catch (cause) {

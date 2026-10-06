@@ -62,7 +62,9 @@ export class AppController {
   ): Promise<RecordingStatusResponse> {
     const recording = await database.recording.findFirst({
       where: { id: recordingId, guestSessionId },
-      include: { transcriptionJobs: { orderBy: { createdAt: 'desc' }, take: 1 } },
+      include: {
+        transcriptionJobs: { orderBy: { createdAt: 'desc' }, take: 1 },
+      },
     });
 
     if (!recording) throw new NotFoundException('Recording not found');
