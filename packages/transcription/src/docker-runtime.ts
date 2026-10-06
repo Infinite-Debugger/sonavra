@@ -50,7 +50,13 @@ export class DockerMediaPreprocessor {
     const outputPath = join(workingDirectory, 'normalized.wav');
 
     try {
-      await run('docker', ['exec', this.container, 'mkdir', '-p', containerDir]);
+      await run('docker', [
+        'exec',
+        this.container,
+        'mkdir',
+        '-p',
+        containerDir,
+      ]);
       await run('docker', [
         'cp',
         sourcePath,
@@ -137,7 +143,9 @@ export class DockerFasterWhisperEngine implements TranscriptionEngine {
     this.diarizationModel = options.diarizationModel;
   }
 
-  async transcribe(request: TranscriptionRequest): Promise<TranscriptionResult> {
+  async transcribe(
+    request: TranscriptionRequest,
+  ): Promise<TranscriptionResult> {
     if (request.source.kind !== 'file') {
       throw new TranscriptionEngineError(
         'Docker transcription requires a local media file.',
