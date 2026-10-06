@@ -113,7 +113,7 @@ export class UploadService {
     ) {
       throw new UploadValidationError('Upload is invalid or expired.');
     }
-    if (recording.status === 'UPLOADED') {
+    if (recording.status === 'UPLOADED' || recording.status === 'QUEUED') {
       return {
         recordingId: recording.id,
         status: 'QUEUED',
@@ -163,7 +163,7 @@ export class UploadService {
 
     return {
       recordingId: recording.id,
-      status: 'UPLOADED',
+      status: 'QUEUED',
       expiresAt: recording.expiresAt.toISOString(),
     };
   }
