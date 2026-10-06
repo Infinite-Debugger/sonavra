@@ -5,7 +5,6 @@ dist
 coverage
 .env
 .env.*
-!.env.example
 apps/web/next-env.d.ts
 .DS_Store
 *.log

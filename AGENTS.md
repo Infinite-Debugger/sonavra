@@ -57,6 +57,15 @@ These rules apply to all work in this repository.
 - For frontend changes, verify the live route when an authenticated local session is available and state any verification boundary clearly.
 - Record commands run and meaningful limitations in the pull request body.
 
+## Frontend styling
+
+- Use Tailwind CSS for Sonavra web UI. Do not introduce another styling framework without an explicit architecture decision.
+- Every new or changed user-facing screen must support both light and dark color schemes.
+- Prefer Tailwind utility classes and small reusable React components over page-specific stylesheets.
+- Keep global CSS deliberately small: the Tailwind import, shared design/theme tokens, and genuinely global browser/base rules only.
+- Do not create large `style.css`, `styles.css`, or page-level CSS files. Extract repeated patterns into components or shared semantic tokens instead.
+- Treat responsive behavior, keyboard/focus states, and light/dark contrast as part of feature acceptance, not follow-up polish.
+
 ## Security and privacy
 
 - Never commit credentials, access tokens, private keys, secrets, `.env` contents, private recordings, transcripts, or user data.

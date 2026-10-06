@@ -8,6 +8,7 @@ datasource db {
 }
 
 enum RecordingStatus {
+  UPLOADING
   UPLOADED
   QUEUED
   PROCESSING

@@ -33,14 +33,15 @@ services:
       test:
         [
           'CMD',
-          'wget',
-          '-q',
-          '--spider',
-          'http://localhost:9333/cluster/status',
+          'curl',
+          '--fail',
+          '--silent',
+          'http://localhost:9333/cluster/healthz',
         ]
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 30s
 
 volumes:
   sonavra-postgres-data:

@@ -23,6 +23,7 @@ const storage: ObjectStorage = {
   presignDownload: async () => {
     throw new Error('unused');
   },
+  statObject: async () => null,
   downloadObject: async () => new Response(Buffer.from('media')),
   deleteObject: async () => undefined,
 };
