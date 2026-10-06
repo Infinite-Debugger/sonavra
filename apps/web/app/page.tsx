@@ -6,7 +6,6 @@ import type {
   CreateUploadResponse,
 } from '@sonavra/types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
 const ACCEPTED_TYPES = [
   'audio/ogg',
@@ -30,7 +29,7 @@ function errorMessage(error: unknown) {
 }
 
 async function apiJson<T>(path: string, init: RequestInit) {
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(`/api${path}`, {
     ...init,
     headers: { 'content-type': 'application/json', ...init.headers },
   });
