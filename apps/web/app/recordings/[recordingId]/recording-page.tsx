@@ -23,6 +23,7 @@ export default function RecordingPage() {
   const [status, setStatus] = useState<RecordingStatusResponse | null>(null);
   const [transcript, setTranscript] = useState<TranscriptResponse | null>(null);
   const [error, setError] = useState('');
+  const [retrying, setRetrying] = useState(false);
 
   useEffect(() => {
     const guestSessionId = localStorage.getItem('sonavraGuestSessionId');
@@ -63,6 +64,26 @@ export default function RecordingPage() {
     };
   }, [recordingId]);
 
+  async function retry() {
+    const guestSessionId = localStorage.getItem('sonavraGuestSessionId');
+    if (!guestSessionId) return;
+    setRetrying(true);
+    try {
+      const response = await fetch(`/api/recordings/${recordingId}/transcription-jobs`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ guestSessionId }),
+      });
+      if (!response.ok) throw new Error('Unable to retry transcription.');
+      setStatus((current) => current ? { ...current, status: 'QUEUED', errorMessage: null } : current);
+      window.location.reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to retry transcription.');
+    } finally {
+      setRetrying(false);
+    }
+  }
+
   if (error) {
     return <main className="grid min-h-screen place-items-center bg-white px-5 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50"><p className="rounded-2xl bg-zinc-100 px-6 py-5 text-red-700 dark:bg-zinc-900 dark:text-red-300">{error}</p></main>;
   }
@@ -101,6 +122,16 @@ export default function RecordingPage() {
           {failed ? status?.errorMessage ?? 'The transcription could not be completed.' : 'You can leave this page open. Sonavra will show the transcript here when it is ready.'}
         </p>
         {!failed && <div className="mx-auto mt-8 h-2 w-48 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"><div className="h-full w-1/2 animate-pulse rounded-full bg-zinc-950 dark:bg-white" /></div>}
+        {failed && status?.retryable && (
+          <button
+            type="button"
+            disabled={retrying}
+            onClick={() => void retry()}
+            className="mt-7 rounded-full bg-zinc-950 px-5 py-3 font-bold text-white disabled:opacity-50 dark:bg-white dark:text-zinc-950"
+          >
+            {retrying ? 'Retrying…' : 'Try again'}
+          </button>
+        )}
       </section>
     </main>
   );

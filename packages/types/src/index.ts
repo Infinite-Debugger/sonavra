@@ -26,7 +26,13 @@ export interface CompleteUploadResponse {
   expiresAt: string;
 }
 
-export type RecordingJourneyStatus = 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+export type RecordingJourneyStatus =
+  | 'UPLOADING'
+  | 'UPLOADED'
+  | 'QUEUED'
+  | 'PROCESSING'
+  | 'COMPLETED'
+  | 'FAILED';
 
 export interface RecordingStatusResponse {
   recordingId: string;

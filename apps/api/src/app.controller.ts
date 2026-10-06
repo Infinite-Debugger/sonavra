@@ -117,9 +117,12 @@ export class AppController {
 
   @Post('recordings/:recordingId/transcription-jobs')
   @HttpCode(202)
-  async enqueueTranscription(@Param('recordingId') recordingId: string) {
-    const recording = await database.recording.findUnique({
-      where: { id: recordingId },
+  async enqueueTranscription(
+    @Param('recordingId') recordingId: string,
+    @Body() body: { guestSessionId?: string },
+  ) {
+    const recording = await database.recording.findFirst({
+      where: { id: recordingId, guestSessionId: body.guestSessionId },
       select: { id: true },
     });
     if (!recording) throw new NotFoundException('Recording not found');
