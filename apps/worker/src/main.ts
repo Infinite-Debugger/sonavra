@@ -13,7 +13,9 @@ const storage = createS3ObjectStorageFromEnv();
 const runtimeContainer =
   process.env.SONAVRA_TRANSCRIPTION_RUNTIME_CONTAINER ??
   'sonavra-transcription-runtime';
-const preprocessor = new DockerMediaPreprocessor({ container: runtimeContainer });
+const preprocessor = new DockerMediaPreprocessor({
+  container: runtimeContainer,
+});
 const engine = new DockerFasterWhisperEngine({
   container: runtimeContainer,
   model: process.env.SONAVRA_TRANSCRIPTION_MODEL,

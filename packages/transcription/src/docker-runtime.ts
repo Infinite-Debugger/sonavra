@@ -28,7 +28,10 @@ function run(command: string, args: string[]): Promise<string> {
     child.on('error', reject);
     child.on('close', (code) => {
       if (code === 0) resolve(stdout);
-      else reject(new Error(stderr.trim() || `${command} exited with code ${code}`));
+      else
+        reject(
+          new Error(stderr.trim() || `${command} exited with code ${code}`),
+        );
     });
   });
 }
@@ -48,7 +51,11 @@ export class DockerMediaPreprocessor {
 
     try {
       await run('docker', ['exec', this.container, 'mkdir', '-p', containerDir]);
-      await run('docker', ['cp', sourcePath, `${this.container}:${containerDir}/source`]);
+      await run('docker', [
+        'cp',
+        sourcePath,
+        `${this.container}:${containerDir}/source`,
+      ]);
       await run('docker', [
         'exec',
         this.container,
@@ -88,9 +95,13 @@ export class DockerMediaPreprocessor {
         },
       );
     } finally {
-      await run('docker', ['exec', this.container, 'rm', '-rf', containerDir]).catch(
-        () => undefined,
-      );
+      await run('docker', [
+        'exec',
+        this.container,
+        'rm',
+        '-rf',
+        containerDir,
+      ]).catch(() => undefined);
     }
 
     return {
@@ -121,23 +132,31 @@ export class DockerFasterWhisperEngine implements TranscriptionEngine {
     this.container = options.container ?? 'sonavra-transcription-runtime';
     this.model = options.model ?? 'small';
     this.device = options.device ?? 'cpu';
-    this.computeType = options.computeType ?? (this.device === 'cpu' ? 'int8' : 'float16');
+    this.computeType =
+      options.computeType ?? (this.device === 'cpu' ? 'int8' : 'float16');
     this.diarizationModel = options.diarizationModel;
   }
 
   async transcribe(request: TranscriptionRequest): Promise<TranscriptionResult> {
     if (request.source.kind !== 'file') {
-      throw new TranscriptionEngineError('Docker transcription requires a local media file.', {
-        code: 'invalid_request',
-        retryable: false,
-        engine: this.name,
-      });
+      throw new TranscriptionEngineError(
+        'Docker transcription requires a local media file.',
+        {
+          code: 'invalid_request',
+          retryable: false,
+          engine: this.name,
+        },
+      );
     }
 
     const id = randomUUID();
     const mediaPath = `/tmp/sonavra-${id}.wav`;
     try {
-      await run('docker', ['cp', request.source.path, `${this.container}:${mediaPath}`]);
+      await run('docker', [
+        'cp',
+        request.source.path,
+        `${this.container}:${mediaPath}`,
+      ]);
       const args = [
         'exec',
         this.container,
@@ -171,9 +190,13 @@ export class DockerFasterWhisperEngine implements TranscriptionEngine {
         },
       );
     } finally {
-      await run('docker', ['exec', this.container, 'rm', '-f', mediaPath]).catch(
-        () => undefined,
-      );
+      await run('docker', [
+        'exec',
+        this.container,
+        'rm',
+        '-f',
+        mediaPath,
+      ]).catch(() => undefined);
     }
   }
 }
