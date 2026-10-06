@@ -61,3 +61,13 @@ export interface TranscriptResponse {
     speakerId: string | null;
   }>;
 }
+
+export interface UpdateTranscriptSegmentRequest {
+  guestSessionId: string;
+  text: string;
+}
+
+export interface UpdateTranscriptSpeakerRequest {
+  guestSessionId: string;
+  displayName: string;
+}
