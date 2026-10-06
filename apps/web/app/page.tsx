@@ -75,6 +75,7 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
   const [filename, setFilename] = useState('');
   const [message, setMessage] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
 
   async function upload(file: File) {
     if (file.size > MAX_UPLOAD_BYTES) {
@@ -118,7 +119,11 @@ export default function Home() {
       );
     } catch (error) {
       setState('error');
-      setMessage(errorMessage(error));
+      setMessage(
+        error instanceof TypeError
+          ? 'Couldn’t connect to Sonavra. Please try again.'
+          : errorMessage(error),
+      );
     }
   }
 
@@ -132,20 +137,48 @@ export default function Home() {
         <span className="mb-5 inline-block text-xs font-extrabold tracking-[0.24em] text-zinc-500 dark:text-zinc-400">
           SONAVRA
         </span>
-        <h1 className="text-5xl leading-[0.98] font-bold tracking-[-0.055em] sm:text-7xl">
+        <h1 className="text-5xl leading-[1.04] font-bold tracking-[-0.025em] sm:text-[4rem]">
           Turn recordings into transcripts.
         </h1>
-        <p className="mx-auto mt-6 mb-9 max-w-2xl text-base leading-7 text-zinc-600 sm:text-lg dark:text-zinc-400">
+        <p className="mx-auto mt-7 mb-10 max-w-2xl text-base leading-7 text-zinc-600 sm:text-lg dark:text-zinc-400">
           Drop in audio or video. Sonavra keeps your source private and prepares
           it for self-hosted transcription.
         </p>
 
         <div
-          className="flex flex-col items-center gap-3 rounded-3xl border border-dashed border-zinc-300 bg-zinc-50 px-6 py-11 shadow-2xl shadow-zinc-200/40 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-black/30"
+          className={`flex cursor-pointer flex-col items-center gap-3 rounded-3xl border border-dashed px-5 py-9 shadow-xl transition sm:px-6 sm:py-10 ${
+            isDragging
+              ? 'border-zinc-950 bg-zinc-100 ring-2 ring-zinc-950/10 dark:border-white dark:bg-zinc-800 dark:ring-white/10'
+              : 'border-zinc-300 bg-zinc-50 shadow-zinc-200/30 hover:border-zinc-400 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:shadow-black/30 dark:hover:border-zinc-600 dark:hover:bg-zinc-800'
+          }`}
+          role="button"
+          tabIndex={state === 'uploading' ? -1 : 0}
+          onClick={() => {
+            if (state !== 'uploading') inputRef.current?.click();
+          }}
+          onKeyDown={(event) => {
+            if (
+              state !== 'uploading' &&
+              (event.key === 'Enter' || event.key === ' ')
+            ) {
+              event.preventDefault();
+              inputRef.current?.click();
+            }
+          }}
+          onDragEnter={(event) => {
+            event.preventDefault();
+            if (state !== 'uploading') setIsDragging(true);
+          }}
           onDragOver={(event) => event.preventDefault()}
+          onDragLeave={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+              setIsDragging(false);
+            }
+          }}
           onDrop={(event) => {
             event.preventDefault();
-            chooseFile(event.dataTransfer.files[0]);
+            setIsDragging(false);
+            if (state !== 'uploading') chooseFile(event.dataTransfer.files[0]);
           }}
         >
           <input
@@ -156,22 +189,25 @@ export default function Home() {
             onChange={(event) => chooseFile(event.target.files?.[0])}
           />
           <div
-            className="mb-1 grid size-13 place-items-center rounded-full bg-zinc-950 text-3xl text-white dark:bg-white dark:text-zinc-950"
+            className="mb-1 grid size-11 place-items-center rounded-full bg-zinc-950 text-2xl text-white dark:bg-white dark:text-zinc-950"
             aria-hidden="true"
           >
             ↑
           </div>
-          <strong className="text-xl">
+          <strong className="max-w-full truncate text-lg sm:text-xl">
             {state === 'uploading' ? filename : 'Drop a recording here'}
           </strong>
-          <span className="text-sm text-zinc-500 dark:text-zinc-400">
+          <span className="text-xs text-zinc-500 sm:text-sm dark:text-zinc-400">
             OGG, MP3, WAV, M4A, MP4 or WebM · up to 500 MB
           </span>
           <button
             className="mt-2 cursor-pointer rounded-full bg-zinc-950 px-5 py-3 font-bold text-white transition hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-950 disabled:cursor-wait disabled:opacity-50 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-200 dark:focus-visible:outline-white"
             type="button"
             disabled={state === 'uploading'}
-            onClick={() => inputRef.current?.click()}
+            onClick={(event) => {
+              event.stopPropagation();
+              inputRef.current?.click();
+            }}
           >
             Choose file
           </button>
