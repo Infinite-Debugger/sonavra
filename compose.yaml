@@ -44,6 +44,7 @@ services:
       start_period: 30s
 
   transcription-runtime:
+    container_name: sonavra-transcription-runtime
     build:
       context: ./packages/transcription/runtime
       dockerfile: Dockerfile

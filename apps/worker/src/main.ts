@@ -1,16 +1,22 @@
 import { serviceName } from '@sonavra/config';
 import { createDatabase } from '@sonavra/database';
 import { createS3ObjectStorageFromEnv } from '@sonavra/storage';
-import { FasterWhisperEngine, MediaPreprocessor } from '@sonavra/transcription';
+import {
+  DockerFasterWhisperEngine,
+  DockerMediaPreprocessor,
+} from '@sonavra/transcription';
 
 import { TranscriptionJobProcessor } from './transcription-jobs.js';
 
 const database = createDatabase();
 const storage = createS3ObjectStorageFromEnv();
-const preprocessor = new MediaPreprocessor();
-const engine = new FasterWhisperEngine({
+const runtimeContainer =
+  process.env.SONAVRA_TRANSCRIPTION_RUNTIME_CONTAINER ??
+  'sonavra-transcription-runtime';
+const preprocessor = new DockerMediaPreprocessor({ container: runtimeContainer });
+const engine = new DockerFasterWhisperEngine({
+  container: runtimeContainer,
   model: process.env.SONAVRA_TRANSCRIPTION_MODEL,
-  modelCache: process.env.SONAVRA_MODEL_CACHE,
   device: process.env.SONAVRA_TRANSCRIPTION_DEVICE === 'cuda' ? 'cuda' : 'cpu',
   computeType: process.env.SONAVRA_TRANSCRIPTION_COMPUTE_TYPE,
   diarizationModel: process.env.SONAVRA_DIARIZATION_MODEL,

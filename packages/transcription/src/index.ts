@@ -20,3 +20,5 @@ export type {
   TranscriptionResult,
   TranscriptionSource,
 } from './types.js';
+
+export * from './docker-runtime.js';
