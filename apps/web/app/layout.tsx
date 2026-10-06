@@ -1,5 +1,12 @@
+import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'Sonavra | Private self-hosted transcription',
+  description:
+    'Turn audio and video recordings into private, self-hosted transcripts.',
+};
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

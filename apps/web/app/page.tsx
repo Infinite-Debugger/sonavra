@@ -132,10 +132,10 @@ export default function Home() {
         <span className="mb-5 inline-block text-xs font-extrabold tracking-[0.24em] text-zinc-500 dark:text-zinc-400">
           SONAVRA
         </span>
-        <h1 className="text-5xl leading-[0.98] font-bold tracking-[-0.055em] sm:text-7xl">
+        <h1 className="text-5xl leading-[1.04] font-bold tracking-[-0.025em] sm:text-7xl">
           Turn recordings into transcripts.
         </h1>
-        <p className="mx-auto mt-6 mb-9 max-w-2xl text-base leading-7 text-zinc-600 sm:text-lg dark:text-zinc-400">
+        <p className="mx-auto mt-7 mb-10 max-w-2xl text-base leading-7 text-zinc-600 sm:text-lg dark:text-zinc-400">
           Drop in audio or video. Sonavra keeps your source private and prepares
           it for self-hosted transcription.
         </p>
