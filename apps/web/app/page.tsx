@@ -113,9 +113,7 @@ export default function Home() {
 
       setProgress(100);
       setState('complete');
-      setMessage(
-        `Upload complete. Recording ${completed.recordingId.slice(0, 8)} is ready.`,
-      );
+      window.location.assign(`/recordings/${completed.recordingId}`);
     } catch (error) {
       setState('error');
       setMessage(

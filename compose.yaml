@@ -43,6 +43,24 @@ services:
       retries: 10
       start_period: 30s
 
+  transcription-runtime:
+    container_name: sonavra-transcription-runtime
+    build:
+      context: ./packages/transcription/runtime
+      dockerfile: Dockerfile
+    environment:
+      SONAVRA_MODEL_CACHE: /models/whisper
+    volumes:
+      - sonavra-models:/models
+    command: ['sleep', 'infinity']
+    healthcheck:
+      test: ['CMD', 'python', 'runtime_check.py']
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
 volumes:
   sonavra-postgres-data:
   sonavra-object-storage-data:
+  sonavra-models:

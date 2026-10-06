@@ -7,10 +7,13 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
 } from '@nestjs/common';
 import type {
   CompleteUploadRequest,
   CreateUploadRequest,
+  RecordingStatusResponse,
+  TranscriptResponse,
 } from '@sonavra/types';
 import { createDatabase } from '@sonavra/database';
 import { UploadService, UploadValidationError } from './uploads.js';
@@ -52,11 +55,77 @@ export class AppController {
       throw error;
     }
   }
+  @Get('recordings/:recordingId/status')
+  async recordingStatus(
+    @Param('recordingId') recordingId: string,
+    @Query('guestSessionId') guestSessionId: string,
+  ): Promise<RecordingStatusResponse> {
+    const recording = await database.recording.findFirst({
+      where: { id: recordingId, guestSessionId },
+      include: {
+        transcriptionJobs: { orderBy: { createdAt: 'desc' }, take: 1 },
+      },
+    });
+
+    if (!recording) throw new NotFoundException('Recording not found');
+    const job = recording.transcriptionJobs[0];
+    return {
+      recordingId,
+      status: recording.status as RecordingStatusResponse['status'],
+      jobId: job?.id ?? null,
+      retryable: job?.retryable ?? false,
+      errorMessage: job?.status === 'FAILED' ? job.errorMessage : null,
+    };
+  }
+
+  @Get('recordings/:recordingId/transcript')
+  async transcript(
+    @Param('recordingId') recordingId: string,
+    @Query('guestSessionId') guestSessionId: string,
+  ): Promise<TranscriptResponse> {
+    const recording = await database.recording.findFirst({
+      where: { id: recordingId, guestSessionId },
+      include: {
+        transcript: {
+          include: {
+            speakers: true,
+            segments: { orderBy: { sequence: 'asc' } },
+          },
+        },
+      },
+    });
+    if (!recording || !recording.transcript) {
+      throw new NotFoundException('Transcript not found');
+    }
+    return {
+      recordingId,
+      filename: recording.originalFilename,
+      language: recording.transcript.language,
+      durationMs: recording.durationMs,
+      speakers: recording.transcript.speakers.map((speaker) => ({
+        id: speaker.id,
+        label: speaker.label,
+        displayName: speaker.displayName,
+      })),
+      segments: recording.transcript.segments.map((segment) => ({
+        id: segment.id,
+        sequence: segment.sequence,
+        startMs: segment.startMs,
+        endMs: segment.endMs,
+        text: segment.text,
+        speakerId: segment.speakerId,
+      })),
+    };
+  }
+
   @Post('recordings/:recordingId/transcription-jobs')
   @HttpCode(202)
-  async enqueueTranscription(@Param('recordingId') recordingId: string) {
-    const recording = await database.recording.findUnique({
-      where: { id: recordingId },
+  async enqueueTranscription(
+    @Param('recordingId') recordingId: string,
+    @Body() body: { guestSessionId?: string },
+  ) {
+    const recording = await database.recording.findFirst({
+      where: { id: recordingId, guestSessionId: body.guestSessionId },
       select: { id: true },
     });
     if (!recording) throw new NotFoundException('Recording not found');

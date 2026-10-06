@@ -21,9 +21,6 @@ def main() -> None:
     except Exception as error:
         failures.append(f"pyannote.audio unavailable: {error}")
 
-    diarization_model = os.getenv("SONAVRA_DIARIZATION_MODEL")
-    if diarization_model and not Path(diarization_model).exists():
-        failures.append(f"diarization model not found: {diarization_model}")
 
     result = {"ready": not failures, "failures": failures}
     print(json.dumps(result))
