@@ -85,22 +85,42 @@ export default function RecordingPage() {
   }
 
   if (error) {
-    return <main className="grid min-h-screen place-items-center bg-white px-5 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50"><p className="rounded-2xl bg-zinc-100 px-6 py-5 text-red-700 dark:bg-zinc-900 dark:text-red-300">{error}</p></main>;
+    return (
+      <main className="grid min-h-screen place-items-center bg-white px-5 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
+        <p className="rounded-2xl bg-zinc-100 px-6 py-5 text-red-700 dark:bg-zinc-900 dark:text-red-300">
+          {error}
+        </p>
+      </main>
+    );
   }
 
   if (transcript) {
-    const speakers = new Map(transcript.speakers.map((speaker) => [speaker.id, speaker.displayName ?? speaker.label]));
+    const speakers = new Map(
+      transcript.speakers.map((speaker) => [
+        speaker.id,
+        speaker.displayName ?? speaker.label,
+      ]),
+    );
     return (
       <main className="min-h-screen bg-white px-5 py-12 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
         <article className="mx-auto max-w-3xl">
           <p className="mb-3 text-xs font-extrabold tracking-[0.24em] text-zinc-500 dark:text-zinc-400">SONAVRA</p>
-          <h1 className="truncate text-3xl font-bold tracking-tight sm:text-4xl">{transcript.filename}</h1>
-          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">Transcript{transcript.language ? ` · ${transcript.language.toUpperCase()}` : ''}</p>
+          <h1 className="truncate text-3xl font-bold tracking-tight sm:text-4xl">
+            {transcript.filename}
+          </h1>
+          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+            Transcript
+            {transcript.language
+              ? ` · ${transcript.language.toUpperCase()}`
+              : ''}
+          </p>
           <div className="mt-10 space-y-7">
             {transcript.segments.map((segment) => (
               <section key={segment.id} className="grid gap-2 sm:grid-cols-[7rem_1fr]">
                 <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                  <strong className="block text-zinc-800 dark:text-zinc-200">{segment.speakerId ? speakers.get(segment.speakerId) : 'Speaker'}</strong>
+                  <strong className="block text-zinc-800 dark:text-zinc-200">{segment.speakerId
+                      ? speakers.get(segment.speakerId)
+                      : 'Speaker'}</strong>
                   {formatTime(segment.startMs)}
                 </div>
                 <p className="leading-7">{segment.text}</p>
@@ -117,11 +137,23 @@ export default function RecordingPage() {
     <main className="grid min-h-screen place-items-center bg-white px-5 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
       <section className="w-full max-w-md text-center">
         <p className="mb-4 text-xs font-extrabold tracking-[0.24em] text-zinc-500 dark:text-zinc-400">SONAVRA</p>
-        <h1 className="text-3xl font-bold">{failed ? 'Transcription failed' : status?.status === 'PROCESSING' ? 'Transcribing your recording' : 'Your recording is queued'}</h1>
+        <h1 className="text-3xl font-bold">
+          {failed
+            ? 'Transcription failed'
+            : status?.status === 'PROCESSING'
+              ? 'Transcribing your recording'
+              : 'Your recording is queued'}
+        </h1>
         <p className="mt-4 leading-7 text-zinc-600 dark:text-zinc-400">
-          {failed ? status?.errorMessage ?? 'The transcription could not be completed.' : 'You can leave this page open. Sonavra will show the transcript here when it is ready.'}
+          {failed
+            ? (status?.errorMessage ?? 'The transcription could not be completed.')
+            : 'You can leave this page open. Sonavra will show the transcript here when it is ready.'}
         </p>
-        {!failed && <div className="mx-auto mt-8 h-2 w-48 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"><div className="h-full w-1/2 animate-pulse rounded-full bg-zinc-950 dark:bg-white" /></div>}
+        {!failed && (
+          <div className="mx-auto mt-8 h-2 w-48 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
+            <div className="h-full w-1/2 animate-pulse rounded-full bg-zinc-950 dark:bg-white" />
+          </div>
+        )}
         {failed && status?.retryable && (
           <button
             type="button"
