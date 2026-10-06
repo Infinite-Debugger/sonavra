@@ -116,16 +116,10 @@ export class UploadService {
     if (recording.status === 'UPLOADED') {
       return {
         recordingId: recording.id,
-        status: 'UPLOADED',
+        status: 'QUEUED',
         expiresAt: recording.expiresAt.toISOString(),
       };
     }
-    if (recording.status !== 'UPLOADING') {
-      throw new UploadValidationError(
-        'Upload cannot be completed in its current state.',
-      );
-    }
-
     const object = await this.storage.statObject(recording.objectKey);
     if (!object) {
       throw new UploadValidationError('The media upload has not completed.');
@@ -145,9 +139,26 @@ export class UploadService {
       );
     }
 
-    await this.database.recording.update({
-      where: { id: recording.id },
-      data: { status: 'UPLOADED' },
+    await this.database.$transaction(async (tx) => {
+      await tx.recording.update({
+        where: { id: recording.id },
+        data: { status: 'QUEUED' },
+      });
+      const active = await tx.transcriptionJob.findFirst({
+        where: {
+          recordingId: recording.id,
+          status: { in: ['QUEUED', 'PROCESSING'] },
+        },
+      });
+      if (!active) {
+        await tx.transcriptionJob.create({
+          data: {
+            recordingId: recording.id,
+            status: 'QUEUED',
+            availableAt: new Date(),
+          },
+        });
+      }
     });
 
     return {
