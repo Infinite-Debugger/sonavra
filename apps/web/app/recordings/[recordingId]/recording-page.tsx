@@ -159,7 +159,11 @@ export default function RecordingPage() {
     void media.play();
   }
 
-  function scheduleSave(key: string, path: string, payload: Record<string, string>) {
+  function scheduleSave(
+    key: string,
+    path: string,
+    payload: Record<string, string>,
+  ) {
     const guestSessionId = localStorage.getItem('sonavraGuestSessionId');
     if (!guestSessionId) {
       setSaveState('error');
@@ -182,7 +186,9 @@ export default function RecordingPage() {
         saveTimers.current.delete(key);
         setSaveState('error');
         setSaveError(
-          cause instanceof Error ? cause.message : 'Unable to save your changes.',
+          cause instanceof Error
+            ? cause.message
+            : 'Unable to save your changes.',
         );
       }
     }, 650);
@@ -340,7 +346,9 @@ export default function RecordingPage() {
                         </button>
                       </div>
                       <textarea
-                        aria-label={`Transcript at ${formatTime(segment.startMs)}`}
+                        aria-label={`Transcript at ${formatTime(
+                          segment.startMs,
+                        )}`}
                         value={segment.text}
                         rows={Math.max(2, Math.ceil(segment.text.length / 80))}
                         onChange={(event) =>

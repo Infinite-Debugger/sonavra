@@ -12,7 +12,10 @@ describe('transcript edit validation', () => {
   });
 
   it('rejects empty transcript text', () => {
-    assert.throws(() => normalizeSegmentText('   '), TranscriptEditValidationError);
+    assert.throws(
+      () => normalizeSegmentText('   '),
+      TranscriptEditValidationError,
+    );
   });
 
   it('normalizes speaker names', () => {

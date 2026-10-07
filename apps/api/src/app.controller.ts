@@ -136,7 +136,6 @@ export class AppController {
     };
   }
 
-
   @Patch('recordings/:recordingId/transcript/segments/:segmentId')
   async updateTranscriptSegment(
     @Param('recordingId') recordingId: string,
