@@ -8,7 +8,10 @@ import {
 
 describe('transcript edit validation', () => {
   it('normalizes transcript text', () => {
-    assert.equal(normalizeSegmentText('  corrected words  '), 'corrected words');
+    assert.equal(
+      normalizeSegmentText('  corrected words  '),
+      'corrected words',
+    );
   });
 
   it('rejects empty transcript text', () => {
@@ -23,6 +26,9 @@ describe('transcript edit validation', () => {
   });
 
   it('rejects empty speaker names', () => {
-    assert.throws(() => normalizeSpeakerName(''), TranscriptEditValidationError);
+    assert.throws(
+      () => normalizeSpeakerName(''),
+      TranscriptEditValidationError,
+    );
   });
 });
