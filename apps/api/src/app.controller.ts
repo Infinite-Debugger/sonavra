@@ -6,6 +6,7 @@ import {
   HttpCode,
   NotFoundException,
   Param,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
@@ -14,10 +15,17 @@ import type {
   CreateUploadRequest,
   RecordingStatusResponse,
   TranscriptResponse,
+  UpdateTranscriptSegmentRequest,
+  UpdateTranscriptSpeakerRequest,
 } from '@sonavra/types';
 import { createDatabase } from '@sonavra/database';
 import { createS3ObjectStorageFromEnv } from '@sonavra/storage';
 import { UploadService, UploadValidationError } from './uploads.js';
+import {
+  normalizeSegmentText,
+  normalizeSpeakerName,
+  TranscriptEditValidationError,
+} from './transcript-edits.js';
 
 const uploads = new UploadService();
 const database = createDatabase();
@@ -126,6 +134,76 @@ export class AppController {
         speakerId: segment.speakerId,
       })),
     };
+  }
+
+  @Patch('recordings/:recordingId/transcript/segments/:segmentId')
+  async updateTranscriptSegment(
+    @Param('recordingId') recordingId: string,
+    @Param('segmentId') segmentId: string,
+    @Body() body: UpdateTranscriptSegmentRequest,
+  ) {
+    if (!body.guestSessionId) {
+      throw new NotFoundException('Transcript segment not found');
+    }
+
+    let text: string;
+    try {
+      text = normalizeSegmentText(body.text);
+    } catch (error) {
+      if (error instanceof TranscriptEditValidationError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+
+    const result = await database.transcriptSegment.updateMany({
+      where: {
+        id: segmentId,
+        transcript: {
+          recording: { id: recordingId, guestSessionId: body.guestSessionId },
+        },
+      },
+      data: { text },
+    });
+    if (result.count !== 1) {
+      throw new NotFoundException('Transcript segment not found');
+    }
+    return { id: segmentId, text };
+  }
+
+  @Patch('recordings/:recordingId/transcript/speakers/:speakerId')
+  async updateTranscriptSpeaker(
+    @Param('recordingId') recordingId: string,
+    @Param('speakerId') speakerId: string,
+    @Body() body: UpdateTranscriptSpeakerRequest,
+  ) {
+    if (!body.guestSessionId) {
+      throw new NotFoundException('Transcript speaker not found');
+    }
+
+    let displayName: string;
+    try {
+      displayName = normalizeSpeakerName(body.displayName);
+    } catch (error) {
+      if (error instanceof TranscriptEditValidationError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
+
+    const result = await database.speaker.updateMany({
+      where: {
+        id: speakerId,
+        transcript: {
+          recording: { id: recordingId, guestSessionId: body.guestSessionId },
+        },
+      },
+      data: { displayName },
+    });
+    if (result.count !== 1) {
+      throw new NotFoundException('Transcript speaker not found');
+    }
+    return { id: speakerId, displayName };
   }
 
   @Post('recordings/:recordingId/transcription-jobs')

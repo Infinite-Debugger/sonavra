@@ -7,6 +7,8 @@ import type {
   TranscriptResponse,
 } from '@sonavra/types';
 
+type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
+
 async function getJson<T>(path: string, guestSessionId: string) {
   const response = await fetch(
     `/api${path}?guestSessionId=${encodeURIComponent(guestSessionId)}`,
@@ -14,6 +16,20 @@ async function getJson<T>(path: string, guestSessionId: string) {
   );
   if (!response.ok) throw new Error('Unable to load this recording.');
   return (await response.json()) as T;
+}
+
+async function patchJson(path: string, body: Record<string, string>) {
+  const response = await fetch(`/api${path}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      message?: string;
+    } | null;
+    throw new Error(payload?.message ?? 'Unable to save your changes.');
+  }
 }
 
 function formatTime(ms: number) {
@@ -26,13 +42,39 @@ function formatTime(ms: number) {
     : `${minutes}:${seconds}`;
 }
 
+function SaveIndicator({ state }: { state: SaveState }) {
+  const label = {
+    idle: 'All changes saved',
+    dirty: 'Unsaved changes',
+    saving: 'Saving…',
+    saved: 'Saved',
+    error: 'Save failed',
+  }[state];
+
+  return (
+    <span
+      role="status"
+      className={`text-xs ${
+        state === 'error'
+          ? 'text-red-600 dark:text-red-400'
+          : 'text-zinc-500 dark:text-zinc-400'
+      }`}
+    >
+      {label}
+    </span>
+  );
+}
+
 export default function RecordingPage() {
   const { recordingId } = useParams<{ recordingId: string }>();
   const mediaRef = useRef<HTMLMediaElement>(null);
   const activeSegmentRef = useRef<HTMLElement>(null);
+  const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [status, setStatus] = useState<RecordingStatusResponse | null>(null);
   const [transcript, setTranscript] = useState<TranscriptResponse | null>(null);
   const [currentMs, setCurrentMs] = useState(0);
+  const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [saveError, setSaveError] = useState('');
   const [error, setError] = useState('');
   const [retrying, setRetrying] = useState(false);
 
@@ -82,6 +124,13 @@ export default function RecordingPage() {
   }, [recordingId]);
 
   useEffect(() => {
+    const timers = saveTimers.current;
+    return () => {
+      for (const timer of timers.values()) clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!transcript) return;
     document.title = `${transcript.filename} · Sonavra`;
   }, [transcript]);
@@ -108,6 +157,78 @@ export default function RecordingPage() {
     media.currentTime = startMs / 1000;
     setCurrentMs(startMs);
     void media.play();
+  }
+
+  function scheduleSave(
+    key: string,
+    path: string,
+    payload: Record<string, string>,
+  ) {
+    const guestSessionId = localStorage.getItem('sonavraGuestSessionId');
+    if (!guestSessionId) {
+      setSaveState('error');
+      setSaveError('This guest recording is no longer available.');
+      return;
+    }
+
+    const currentTimer = saveTimers.current.get(key);
+    if (currentTimer) clearTimeout(currentTimer);
+    setSaveState('dirty');
+    setSaveError('');
+
+    const timer = setTimeout(async () => {
+      setSaveState('saving');
+      try {
+        await patchJson(path, { ...payload, guestSessionId });
+        saveTimers.current.delete(key);
+        setSaveState(saveTimers.current.size ? 'dirty' : 'saved');
+      } catch (cause) {
+        saveTimers.current.delete(key);
+        setSaveState('error');
+        setSaveError(
+          cause instanceof Error
+            ? cause.message
+            : 'Unable to save your changes.',
+        );
+      }
+    }, 650);
+    saveTimers.current.set(key, timer);
+  }
+
+  function updateSegment(segmentId: string, text: string) {
+    setTranscript((current) =>
+      current
+        ? {
+            ...current,
+            segments: current.segments.map((segment) =>
+              segment.id === segmentId ? { ...segment, text } : segment,
+            ),
+          }
+        : current,
+    );
+    scheduleSave(
+      `segment:${segmentId}`,
+      `/recordings/${recordingId}/transcript/segments/${segmentId}`,
+      { text },
+    );
+  }
+
+  function updateSpeaker(speakerId: string, displayName: string) {
+    setTranscript((current) =>
+      current
+        ? {
+            ...current,
+            speakers: current.speakers.map((speaker) =>
+              speaker.id === speakerId ? { ...speaker, displayName } : speaker,
+            ),
+          }
+        : current,
+    );
+    scheduleSave(
+      `speaker:${speakerId}`,
+      `/recordings/${recordingId}/transcript/speakers/${speakerId}`,
+      { displayName },
+    );
   }
 
   async function retry() {
@@ -152,21 +273,18 @@ export default function RecordingPage() {
   }
 
   if (transcript) {
-    const speakers = new Map(
-      transcript.speakers.map((speaker) => [
-        speaker.id,
-        speaker.displayName ?? speaker.label,
-      ]),
-    );
     const isVideo = transcript.media.mimeType.startsWith('video/');
 
     return (
       <main className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
           <header className="mb-8">
-            <p className="mb-3 text-xs font-extrabold tracking-[0.24em] text-zinc-500 dark:text-zinc-400">
-              SONAVRA
-            </p>
+            <div className="mb-3 flex items-center justify-between gap-4">
+              <p className="text-xs font-extrabold tracking-[0.24em] text-zinc-500 dark:text-zinc-400">
+                SONAVRA
+              </p>
+              <SaveIndicator state={saveState} />
+            </div>
             <h1 className="break-words text-2xl font-bold tracking-tight sm:text-4xl">
               {transcript.filename}
             </h1>
@@ -176,6 +294,11 @@ export default function RecordingPage() {
                 ? ` · ${transcript.language.toUpperCase()}`
                 : ''}
             </p>
+            {saveError && (
+              <p className="mt-3 text-sm text-red-600 dark:text-red-400">
+                {saveError} Your edit is still visible here so you can retry it.
+              </p>
+            )}
           </header>
 
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
@@ -183,6 +306,11 @@ export default function RecordingPage() {
               <div className="space-y-2">
                 {transcript.segments.map((segment) => {
                   const active = segment.id === activeSegmentId;
+                  const speaker = segment.speakerId
+                    ? transcript.speakers.find(
+                        (item) => item.id === segment.speakerId,
+                      )
+                    : null;
                   return (
                     <section
                       key={segment.id}
@@ -194,11 +322,20 @@ export default function RecordingPage() {
                       }`}
                     >
                       <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                        <strong className="block truncate text-zinc-800 dark:text-zinc-200">
-                          {segment.speakerId
-                            ? speakers.get(segment.speakerId)
-                            : 'Speaker'}
-                        </strong>
+                        {speaker ? (
+                          <input
+                            aria-label={`Rename ${speaker.label}`}
+                            value={speaker.displayName ?? speaker.label}
+                            onChange={(event) =>
+                              updateSpeaker(speaker.id, event.target.value)
+                            }
+                            className="block w-full rounded-md bg-transparent font-semibold text-zinc-800 outline-none focus:bg-white focus:ring-2 focus:ring-zinc-300 dark:text-zinc-200 dark:focus:bg-zinc-950 dark:focus:ring-zinc-700"
+                          />
+                        ) : (
+                          <strong className="block text-zinc-800 dark:text-zinc-200">
+                            Speaker
+                          </strong>
+                        )}
                         <button
                           type="button"
                           onClick={() => seek(segment.startMs)}
@@ -208,13 +345,17 @@ export default function RecordingPage() {
                           {formatTime(segment.startMs)}
                         </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => seek(segment.startMs)}
-                        className="text-left leading-7 text-zinc-800 focus-visible:rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 dark:text-zinc-200"
-                      >
-                        {segment.text}
-                      </button>
+                      <textarea
+                        aria-label={`Transcript at ${formatTime(
+                          segment.startMs,
+                        )}`}
+                        value={segment.text}
+                        rows={Math.max(2, Math.ceil(segment.text.length / 80))}
+                        onChange={(event) =>
+                          updateSegment(segment.id, event.target.value)
+                        }
+                        className="w-full resize-y rounded-xl bg-transparent px-2 py-1 leading-7 text-zinc-800 outline-none focus:bg-white focus:ring-2 focus:ring-zinc-300 dark:text-zinc-200 dark:focus:bg-zinc-950 dark:focus:ring-zinc-700"
+                      />
                     </section>
                   );
                 })}
@@ -250,8 +391,8 @@ export default function RecordingPage() {
                   />
                 )}
                 <p className="mt-3 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-                  Click any timestamp or transcript segment to jump to that
-                  moment.
+                  Click a timestamp to jump to that moment. Edit transcript text
+                  and speaker names directly; changes save automatically.
                 </p>
               </div>
             </aside>
