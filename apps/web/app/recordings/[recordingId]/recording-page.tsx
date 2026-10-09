@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createTranscriptDocx } from './transcript-docx';
 import { useParams } from 'next/navigation';
 import {
   transcriptText,
@@ -248,17 +249,21 @@ export default function RecordingPage() {
     }
   }
 
-  function downloadTranscript(format: 'txt' | 'srt' | 'vtt') {
+  function downloadTranscript(format: 'txt' | 'srt' | 'vtt' | 'docx') {
     if (!transcript) return;
     const content =
-      format === 'txt'
+      format === 'docx'
+        ? createTranscriptDocx(transcript)
+        : format === 'txt'
         ? transcriptText(transcript)
         : format === 'srt'
           ? transcriptSrt(transcript)
           : transcriptVtt(transcript);
-    const mime = format === 'txt' ? 'text/plain' : 'text/vtt';
+    const mime = format === 'docx'
+      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      : format === 'txt' ? 'text/plain' : format === 'srt' ? 'application/x-subrip' : 'text/vtt';
     const url = URL.createObjectURL(
-      new Blob([content], { type: mime + ';charset=utf-8' }),
+      new Blob([content], { type: mime }),
     );
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -354,7 +359,7 @@ export default function RecordingPage() {
             >
               Copy
             </button>
-            {(['txt', 'srt', 'vtt'] as const).map((format) => (
+            {(['txt', 'srt', 'vtt', 'docx'] as const).map((format) => (
               <button
                 key={format}
                 type="button"
