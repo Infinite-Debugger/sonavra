@@ -20,9 +20,13 @@ function timestamp(ms: number, separator: ',' | '.') {
   const minutes = Math.floor((value % 3600000) / 60000);
   const seconds = Math.floor((value % 60000) / 1000);
   const millis = value % 1000;
-  return [hours, minutes, seconds]
-    .map((part) => String(part).padStart(2, '0'))
-    .join(':') + separator + String(millis).padStart(3, '0');
+  return (
+    [hours, minutes, seconds]
+      .map((part) => String(part).padStart(2, '0'))
+      .join(':') +
+    separator +
+    String(millis).padStart(3, '0')
+  );
 }
 
 export function transcriptText(transcript: Transcript) {
@@ -32,17 +36,25 @@ export function transcriptText(transcript: Transcript) {
 }
 
 export function transcriptSrt(transcript: Transcript) {
-  return transcriptLines(transcript)
-    .map((segment, index) =>
-      `${index + 1}\n${timestamp(segment.startMs, ',')} --> ${timestamp(segment.endMs, ',')}\n${segment.speaker}: ${segment.text.trim()}`,
-    )
-    .join('\n\n') + '\n';
+  return (
+    transcriptLines(transcript)
+      .map(
+        (segment, index) =>
+          `${index + 1}\n${timestamp(segment.startMs, ',')} --> ${timestamp(segment.endMs, ',')}\n${segment.speaker}: ${segment.text.trim()}`,
+      )
+      .join('\n\n') + '\n'
+  );
 }
 
 export function transcriptVtt(transcript: Transcript) {
-  return 'WEBVTT\n\n' + transcriptLines(transcript)
-    .map((segment) =>
-      `${timestamp(segment.startMs, '.')} --> ${timestamp(segment.endMs, '.')}\n${segment.speaker}: ${segment.text.trim()}`,
-    )
-    .join('\n\n') + '\n';
+  return (
+    'WEBVTT\n\n' +
+    transcriptLines(transcript)
+      .map(
+        (segment) =>
+          `${timestamp(segment.startMs, '.')} --> ${timestamp(segment.endMs, '.')}\n${segment.speaker}: ${segment.text.trim()}`,
+      )
+      .join('\n\n') +
+    '\n'
+  );
 }
