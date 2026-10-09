@@ -1,15 +1,26 @@
 import type { TranscriptResponse } from '@sonavra/types';
-import { transcriptLines } from './transcript-exports';
+import { transcriptTurns } from './transcript-exports';
 
 type Transcript = Pick<TranscriptResponse, 'speakers' | 'segments'>;
 
 function escapeXml(value: string) {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function paragraph(value: string, bold = false) {
   const style = bold ? '<w:rPr><w:b/></w:rPr>' : '';
-  return `<w:p><w:r>${style}<w:t xml:space="preserve">${escapeXml(value)}</w:t></w:r></w:p>`;
+  const lines = value.split('\n');
+  const text = lines
+    .map((line, index) => {
+      const breakTag = index === 0 ? '' : '<w:br/>';
+      return `${breakTag}<w:t xml:space="preserve">${escapeXml(line)}</w:t>`;
+    })
+    .join('');
+  return `<w:p><w:r>${style}${text}</w:r></w:p>`;
 }
 
 function crc32(bytes: Uint8Array) {
@@ -59,7 +70,10 @@ function zip(files: Array<[string, string]>) {
     offset += local.length + data.length;
   }
 
-  const directoryLength = directory.reduce((sum, entry) => sum + entry.length, 0);
+  const directoryLength = directory.reduce(
+    (sum, entry) => sum + entry.length,
+    0,
+  );
   const end = new Uint8Array(22);
   const footer = new DataView(end.buffer);
   footer.setUint32(0, 0x06054b50, true);
@@ -77,13 +91,21 @@ function zip(files: Array<[string, string]>) {
 }
 
 export function createTranscriptDocx(transcript: Transcript) {
-  const body = transcriptLines(transcript)
-    .map((segment) => paragraph(segment.speaker, true) + paragraph(segment.text.trim()))
+  const body = transcriptTurns(transcript)
+    .map(
+      (turn) => paragraph(turn.speaker, true) + paragraph(turn.text.join('\n')),
+    )
     .join('');
   const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr/></w:body></w:document>`;
   return zip([
-    ['[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'],
-    ['_rels/.rels', '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>'],
+    [
+      '[Content_Types].xml',
+      '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
+    ],
+    [
+      '_rels/.rels',
+      '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>',
+    ],
     ['word/document.xml', document],
   ]);
 }

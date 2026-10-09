@@ -14,6 +14,24 @@ export function transcriptLines(transcript: Transcript) {
   }));
 }
 
+export function transcriptTurns(transcript: Transcript) {
+  const turns: Array<{ speaker: string; text: string[] }> = [];
+
+  for (const segment of transcriptLines(transcript)) {
+    const text = segment.text.trim();
+    if (!text) continue;
+
+    const previous = turns.at(-1);
+    if (previous?.speaker === segment.speaker) {
+      previous.text.push(text);
+    } else {
+      turns.push({ speaker: segment.speaker, text: [text] });
+    }
+  }
+
+  return turns;
+}
+
 function timestamp(ms: number, separator: ',' | '.') {
   const value = Math.max(0, Math.floor(ms));
   const hours = Math.floor(value / 3600000);
@@ -30,8 +48,8 @@ function timestamp(ms: number, separator: ',' | '.') {
 }
 
 export function transcriptText(transcript: Transcript) {
-  return transcriptLines(transcript)
-    .map((segment) => `${segment.speaker}: ${segment.text.trim()}`)
+  return transcriptTurns(transcript)
+    .map((turn) => `${turn.speaker}:\n${turn.text.join('\n')}`)
     .join('\n\n');
 }
 

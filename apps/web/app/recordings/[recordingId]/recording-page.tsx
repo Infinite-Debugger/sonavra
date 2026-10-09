@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createTranscriptDocx } from './transcript-docx';
 import { useParams } from 'next/navigation';
 import {
+  speakerName,
   transcriptText,
   transcriptSrt,
   transcriptVtt,
@@ -255,16 +256,19 @@ export default function RecordingPage() {
       format === 'docx'
         ? createTranscriptDocx(transcript)
         : format === 'txt'
-        ? transcriptText(transcript)
-        : format === 'srt'
-          ? transcriptSrt(transcript)
-          : transcriptVtt(transcript);
-    const mime = format === 'docx'
-      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      : format === 'txt' ? 'text/plain' : format === 'srt' ? 'application/x-subrip' : 'text/vtt';
-    const url = URL.createObjectURL(
-      new Blob([content], { type: mime }),
-    );
+          ? transcriptText(transcript)
+          : format === 'srt'
+            ? transcriptSrt(transcript)
+            : transcriptVtt(transcript);
+    const mime =
+      format === 'docx'
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : format === 'txt'
+          ? 'text/plain'
+          : format === 'srt'
+            ? 'application/x-subrip'
+            : 'text/vtt';
+    const url = URL.createObjectURL(new Blob([content], { type: mime }));
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download =
@@ -316,6 +320,14 @@ export default function RecordingPage() {
 
   if (transcript) {
     const isVideo = transcript.media.mimeType.startsWith('video/');
+    const query = search.trim().toLowerCase();
+    const visibleSegments = transcript.segments.filter((segment) => {
+      if (!query) return true;
+      return (
+        segment.text.toLowerCase().includes(query) ||
+        speakerName(transcript, segment.speakerId).toLowerCase().includes(query)
+      );
+    });
 
     return (
       <main className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
@@ -376,79 +388,66 @@ export default function RecordingPage() {
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
             <article className="min-w-0 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6 dark:border-zinc-800 dark:bg-zinc-900">
               <div className="space-y-2">
-                {transcript.segments
-                  .filter(
-                    (segment) =>
-                      !search.trim() ||
-                      segment.text
-                        .toLowerCase()
-                        .includes(search.trim().toLowerCase()) ||
-                      (
-                        transcript.speakers.find(
-                          (speaker) => speaker.id === segment.speakerId,
-                        )?.displayName ?? ''
+                {visibleSegments.length === 0 && (
+                  <p className="rounded-2xl border border-dashed border-zinc-300 p-4 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                    No transcript matches.
+                  </p>
+                )}
+                {visibleSegments.map((segment) => {
+                  const active = segment.id === activeSegmentId;
+                  const speaker = segment.speakerId
+                    ? transcript.speakers.find(
+                        (item) => item.id === segment.speakerId,
                       )
-                        .toLowerCase()
-                        .includes(search.trim().toLowerCase()),
-                  )
-                  .map((segment) => {
-                    const active = segment.id === activeSegmentId;
-                    const speaker = segment.speakerId
-                      ? transcript.speakers.find(
-                          (item) => item.id === segment.speakerId,
-                        )
-                      : null;
-                    return (
-                      <section
-                        key={segment.id}
-                        ref={active ? activeSegmentRef : undefined}
-                        className={`group grid scroll-m-24 gap-2 rounded-2xl p-3 transition sm:grid-cols-[7rem_1fr] sm:p-4 ${
-                          active
-                            ? 'bg-zinc-100 ring-1 ring-zinc-300 dark:bg-zinc-800 dark:ring-zinc-700'
-                            : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
-                        }`}
-                      >
-                        <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                          {speaker ? (
-                            <input
-                              aria-label={`Rename ${speaker.label}`}
-                              value={speaker.displayName ?? speaker.label}
-                              onChange={(event) =>
-                                updateSpeaker(speaker.id, event.target.value)
-                              }
-                              className="block w-full rounded-md bg-transparent font-semibold text-zinc-800 outline-none focus:bg-white focus:ring-2 focus:ring-zinc-300 dark:text-zinc-200 dark:focus:bg-zinc-950 dark:focus:ring-zinc-700"
-                            />
-                          ) : (
-                            <strong className="block text-zinc-800 dark:text-zinc-200">
-                              Speaker
-                            </strong>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => seek(segment.startMs)}
-                            className="mt-1 rounded font-mono text-xs tabular-nums underline-offset-4 hover:text-zinc-950 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 dark:hover:text-white"
-                            aria-label={`Play from ${formatTime(segment.startMs)}`}
-                          >
-                            {formatTime(segment.startMs)}
-                          </button>
-                        </div>
-                        <textarea
-                          aria-label={`Transcript at ${formatTime(
-                            segment.startMs,
-                          )}`}
-                          value={segment.text}
-                          rows={Math.max(
-                            2,
-                            Math.ceil(segment.text.length / 80),
-                          )}
-                          onChange={(event) =>
-                            updateSegment(segment.id, event.target.value)
-                          }
-                          className="w-full resize-y rounded-xl bg-transparent px-2 py-1 leading-7 text-zinc-800 outline-none focus:bg-white focus:ring-2 focus:ring-zinc-300 dark:text-zinc-200 dark:focus:bg-zinc-950 dark:focus:ring-zinc-700"
-                        />
-                      </section>
-                    );
-                  })}
+                    : null;
+                  return (
+                    <section
+                      key={segment.id}
+                      ref={active ? activeSegmentRef : undefined}
+                      className={`group grid scroll-m-24 gap-2 rounded-2xl p-3 transition sm:grid-cols-[7rem_1fr] sm:p-4 ${
+                        active
+                          ? 'bg-zinc-100 ring-1 ring-zinc-300 dark:bg-zinc-800 dark:ring-zinc-700'
+                          : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+                      }`}
+                    >
+                      <div className="text-sm text-zinc-500 dark:text-zinc-400">
+                        {speaker ? (
+                          <input
+                            aria-label={`Rename ${speaker.label}`}
+                            value={speaker.displayName ?? speaker.label}
+                            onChange={(event) =>
+                              updateSpeaker(speaker.id, event.target.value)
+                            }
+                            className="block w-full rounded-md bg-transparent font-semibold text-zinc-800 outline-none focus:bg-white focus:ring-2 focus:ring-zinc-300 dark:text-zinc-200 dark:focus:bg-zinc-950 dark:focus:ring-zinc-700"
+                          />
+                        ) : (
+                          <strong className="block text-zinc-800 dark:text-zinc-200">
+                            Speaker
+                          </strong>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => seek(segment.startMs)}
+                          className="mt-1 rounded font-mono text-xs tabular-nums underline-offset-4 hover:text-zinc-950 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 dark:hover:text-white"
+                          aria-label={`Play from ${formatTime(segment.startMs)}`}
+                        >
+                          {formatTime(segment.startMs)}
+                        </button>
+                      </div>
+                      <textarea
+                        aria-label={`Transcript at ${formatTime(
+                          segment.startMs,
+                        )}`}
+                        value={segment.text}
+                        rows={Math.max(2, Math.ceil(segment.text.length / 80))}
+                        onChange={(event) =>
+                          updateSegment(segment.id, event.target.value)
+                        }
+                        className="w-full resize-y rounded-xl bg-transparent px-2 py-1 leading-7 text-zinc-800 outline-none focus:bg-white focus:ring-2 focus:ring-zinc-300 dark:text-zinc-200 dark:focus:bg-zinc-950 dark:focus:ring-zinc-700"
+                      />
+                    </section>
+                  );
+                })}
               </div>
             </article>
 
