@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { transcriptText, transcriptSrt, transcriptVtt } from './transcript-exports';
 import type {
   RecordingStatusResponse,
   TranscriptResponse,
@@ -77,6 +78,8 @@ export default function RecordingPage() {
   const [saveError, setSaveError] = useState('');
   const [error, setError] = useState('');
   const [retrying, setRetrying] = useState(false);
+  const [search, setSearch] = useState('');
+  const [copyStatus, setCopyStatus] = useState('');
 
   useEffect(() => {
     const guestSessionId = localStorage.getItem('sonavraGuestSessionId');
@@ -231,6 +234,32 @@ export default function RecordingPage() {
     );
   }
 
+  async function copyTranscript() {
+    if (!transcript) return;
+    try {
+      await navigator.clipboard.writeText(transcriptText(transcript));
+      setCopyStatus('Copied transcript');
+    } catch {
+      setCopyStatus('Unable to copy transcript');
+    }
+  }
+
+  function downloadTranscript(format: 'txt' | 'srt' | 'vtt') {
+    if (!transcript) return;
+    const content = format === 'txt'
+      ? transcriptText(transcript)
+      : format === 'srt'
+        ? transcriptSrt(transcript)
+        : transcriptVtt(transcript);
+    const mime = format === 'txt' ? 'text/plain' : 'text/vtt';
+    const url = URL.createObjectURL(new Blob([content], { type: mime + ';charset=utf-8' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = transcript.filename.replace(/\.[^.]+$/, '') + '.' + format;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   async function retry() {
     const guestSessionId = localStorage.getItem('sonavraGuestSessionId');
     if (!guestSessionId) return;
@@ -301,10 +330,25 @@ export default function RecordingPage() {
             )}
           </header>
 
+          <div className="mb-6 flex flex-wrap items-center gap-3">
+            <input
+              type="search"
+              aria-label="Search transcript"
+              placeholder="Search transcript"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="min-w-0 flex-1 rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            />
+            <button type="button" onClick={() => void copyTranscript()} className="rounded-xl border border-zinc-300 px-4 py-2 text-sm dark:border-zinc-700">Copy</button>
+            {(['txt', 'srt', 'vtt'] as const).map((format) => (
+              <button key={format} type="button" onClick={() => downloadTranscript(format)} className="rounded-xl border border-zinc-300 px-4 py-2 text-sm uppercase dark:border-zinc-700">{format}</button>
+            ))}
+            <span role="status" className="text-xs text-zinc-500">{copyStatus}</span>
+          </div>
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
             <article className="min-w-0 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6 dark:border-zinc-800 dark:bg-zinc-900">
               <div className="space-y-2">
-                {transcript.segments.map((segment) => {
+                {transcript.segments.filter((segment) => !search.trim() || segment.text.toLowerCase().includes(search.trim().toLowerCase()) || (transcript.speakers.find((speaker) => speaker.id === segment.speakerId)?.displayName ?? '').toLowerCase().includes(search.trim().toLowerCase())).map((segment) => {
                   const active = segment.id === activeSegmentId;
                   const speaker = segment.speakerId
                     ? transcript.speakers.find(
