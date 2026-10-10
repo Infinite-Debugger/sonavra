@@ -1,7 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createTranscriptDocx } from './transcript-docx';
 import { useParams } from 'next/navigation';
+import {
+  speakerName,
+  transcriptText,
+  transcriptSrt,
+  transcriptVtt,
+} from './transcript-exports';
 import type {
   RecordingStatusResponse,
   TranscriptResponse,
@@ -77,6 +84,8 @@ export default function RecordingPage() {
   const [saveError, setSaveError] = useState('');
   const [error, setError] = useState('');
   const [retrying, setRetrying] = useState(false);
+  const [search, setSearch] = useState('');
+  const [copyStatus, setCopyStatus] = useState('');
 
   useEffect(() => {
     const guestSessionId = localStorage.getItem('sonavraGuestSessionId');
@@ -231,6 +240,43 @@ export default function RecordingPage() {
     );
   }
 
+  async function copyTranscript() {
+    if (!transcript) return;
+    try {
+      await navigator.clipboard.writeText(transcriptText(transcript));
+      setCopyStatus('Copied transcript');
+    } catch {
+      setCopyStatus('Unable to copy transcript');
+    }
+  }
+
+  function downloadTranscript(format: 'txt' | 'srt' | 'vtt' | 'docx') {
+    if (!transcript) return;
+    const content =
+      format === 'docx'
+        ? createTranscriptDocx(transcript)
+        : format === 'txt'
+          ? transcriptText(transcript)
+          : format === 'srt'
+            ? transcriptSrt(transcript)
+            : transcriptVtt(transcript);
+    const mime =
+      format === 'docx'
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : format === 'txt'
+          ? 'text/plain'
+          : format === 'srt'
+            ? 'application/x-subrip'
+            : 'text/vtt';
+    const url = URL.createObjectURL(new Blob([content], { type: mime }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download =
+      transcript.filename.replace(/\.[^.]+$/, '') + '.' + format;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   async function retry() {
     const guestSessionId = localStorage.getItem('sonavraGuestSessionId');
     if (!guestSessionId) return;
@@ -274,6 +320,14 @@ export default function RecordingPage() {
 
   if (transcript) {
     const isVideo = transcript.media.mimeType.startsWith('video/');
+    const query = search.trim().toLowerCase();
+    const visibleSegments = transcript.segments.filter((segment) => {
+      if (!query) return true;
+      return (
+        segment.text.toLowerCase().includes(query) ||
+        speakerName(transcript, segment.speakerId).toLowerCase().includes(query)
+      );
+    });
 
     return (
       <main className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
@@ -285,7 +339,7 @@ export default function RecordingPage() {
               </p>
               <SaveIndicator state={saveState} />
             </div>
-            <h1 className="break-words text-2xl font-bold tracking-tight sm:text-4xl">
+            <h1 className="wrap-break-word text-2xl font-bold tracking-tight sm:text-4xl">
               {transcript.filename}
             </h1>
             <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
@@ -301,10 +355,45 @@ export default function RecordingPage() {
             )}
           </header>
 
+          <div className="mb-6 flex flex-wrap items-center gap-3">
+            <input
+              type="search"
+              aria-label="Search transcript"
+              placeholder="Search transcript"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="min-w-0 flex-1 rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            />
+            <button
+              type="button"
+              onClick={() => void copyTranscript()}
+              className="rounded-xl border border-zinc-300 px-4 py-2 text-sm dark:border-zinc-700"
+            >
+              Copy
+            </button>
+            {(['txt', 'srt', 'vtt', 'docx'] as const).map((format) => (
+              <button
+                key={format}
+                type="button"
+                onClick={() => downloadTranscript(format)}
+                className="rounded-xl border border-zinc-300 px-4 py-2 text-sm uppercase dark:border-zinc-700"
+              >
+                {format}
+              </button>
+            ))}
+            <span role="status" className="text-xs text-zinc-500">
+              {copyStatus}
+            </span>
+          </div>
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
             <article className="min-w-0 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-6 dark:border-zinc-800 dark:bg-zinc-900">
               <div className="space-y-2">
-                {transcript.segments.map((segment) => {
+                {visibleSegments.length === 0 && (
+                  <p className="rounded-2xl border border-dashed border-zinc-300 p-4 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                    No transcript matches.
+                  </p>
+                )}
+                {visibleSegments.map((segment) => {
                   const active = segment.id === activeSegmentId;
                   const speaker = segment.speakerId
                     ? transcript.speakers.find(
