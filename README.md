@@ -34,6 +34,8 @@ Prisma owns the database schema and migrations in `packages/database/prisma`. Af
 - `packages/storage` - S3-compatible private object storage and presigning
 - `packages/transcription` - transcription provider boundary
 
+Within `apps/web`, keep route entry points, layouts, and global assets in `app`, extracted React components in `components` with PascalCase filenames, and non-UI helpers in `lib` grouped by domain. Keep helper tests beside their implementation.
+
 ## Git hooks
 
 `pnpm install` configures the repository Git hooks through Husky. Before each commit, lint-staged runs ESLint and Prettier only against relevant staged files. Full build, test, typecheck, lint, and formatting verification remains in CI.

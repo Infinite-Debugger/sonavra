@@ -1,12 +1,8 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { TranscriptResponse } from '@sonavra/types';
-import { createTranscriptDocx } from './transcript-docx';
-import {
-  transcriptSrt,
-  transcriptText,
-  transcriptVtt,
-} from './transcript-exports';
+import { createTranscriptDocx } from './docx';
+import { transcriptSrt, transcriptText, transcriptVtt } from './exports';
 
 type Transcript = Pick<TranscriptResponse, 'speakers' | 'segments'>;
 

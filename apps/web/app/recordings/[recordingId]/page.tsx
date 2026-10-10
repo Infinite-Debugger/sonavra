@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import RecordingPage from './recording-page';
+import RecordingPage from '../../../components/RecordingPage';
 
 export const metadata: Metadata = {
   title: 'Transcript',

@@ -1,5 +1,5 @@
 import type { TranscriptResponse } from '@sonavra/types';
-import { transcriptTurns } from './transcript-exports';
+import { transcriptTurns } from './exports';
 
 type Transcript = Pick<TranscriptResponse, 'speakers' | 'segments'>;
 
