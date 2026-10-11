@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createTranscriptDocx } from './transcript-docx';
+import { createTranscriptDocx } from '../lib/transcript/docx';
 import { useParams } from 'next/navigation';
 import {
   speakerName,
   transcriptText,
   transcriptSrt,
   transcriptVtt,
-} from './transcript-exports';
+} from '../lib/transcript/exports';
 import type {
   RecordingStatusResponse,
   TranscriptResponse,

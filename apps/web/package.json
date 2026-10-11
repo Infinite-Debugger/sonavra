@@ -5,7 +5,7 @@
     "dev": "next dev --port $WEB_PORT",
     "build": "next build",
     "start": "next start --port $WEB_PORT",
-    "test": "tsx --test app/**/*.test.ts",
+    "test": "tsx --test \"**/*.test.ts\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
