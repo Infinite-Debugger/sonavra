@@ -129,7 +129,7 @@ export default function Home() {
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-white px-5 py-12 text-zinc-950 transition-colors dark:bg-zinc-950 dark:text-zinc-50">
+    <main className="grid min-h-[calc(100svh-4rem)] place-items-center bg-white px-5 py-12 text-zinc-950 transition-colors dark:bg-zinc-950 dark:text-zinc-50">
       <section className="w-full max-w-3xl text-center">
         <span className="mb-5 inline-block text-xs font-extrabold tracking-[0.24em] text-zinc-500 dark:text-zinc-400">
           SONAVRA
