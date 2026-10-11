@@ -31,9 +31,11 @@ export default function AuthForm({
         }),
       });
       if (!response.ok) {
-        const data = (await response.json()) as { message?: string };
+        const data = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
         throw new Error(
-          data.message ?? 'Unable to access your account. Please try again.',
+          data?.message ?? 'Unable to access your account. Please try again.',
         );
       }
       window.location.assign(next);
