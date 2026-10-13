@@ -35,6 +35,8 @@ export interface RecordingStatusResponse {
   jobId: string | null;
   retryable: boolean;
   errorMessage: string | null;
+  ownership: 'guest' | 'account';
+  canClaim: boolean;
 }
 
 export interface TranscriptResponse {
@@ -63,13 +65,14 @@ export interface TranscriptResponse {
 }
 
 export interface UpdateTranscriptSegmentRequest {
-  guestSessionId: string;
+  guestSessionId?: string;
   text: string;
 }
 
 export interface UpdateTranscriptSpeakerRequest {
-  guestSessionId: string;
+  guestSessionId?: string;
   displayName: string;
 }
 export type AccountUser = { id: string; email: string };
 export type AccountSessionResponse = { user: AccountUser | null };
+export type GuestClaimResponse = { claimedCount: number };
