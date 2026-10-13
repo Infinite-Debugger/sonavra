@@ -28,6 +28,9 @@ export default function AuthForm({
         body: JSON.stringify({
           email: fields.get('email'),
           password: fields.get('password'),
+          guestSessionId: signup
+            ? (localStorage.getItem('sonavraGuestSessionId') ?? undefined)
+            : undefined,
         }),
       });
       if (!response.ok) {
