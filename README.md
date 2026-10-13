@@ -34,7 +34,17 @@ Prisma owns the database schema and migrations in `packages/database/prisma`. Af
 - `packages/storage` - S3-compatible private object storage and presigning
 - `packages/transcription` - transcription provider boundary
 
-Within `apps/web`, keep route entry points, layouts, and global assets in `app`, extracted React components in `components` with PascalCase filenames, and non-UI helpers in `lib` grouped by domain. Keep helper tests beside their implementation.
+Within `apps/web`, keep route entry points, layouts, and global assets in `app`, extracted React components in `components` with PascalCase filenames, and non-UI helpers in `lib` grouped by domain. Keep helper tests beside their implementation. Use `@/` imports for paths rooted at `apps/web`.
+
+## Accounts
+
+Signup, signin, and signout are optional; uploading and reviewing guest recordings remain available without an account. `/account` requires a valid server-verified session. Authentication never clears the browser's guest session or claims guest recordings; recording claims and the account library are separate features.
+
+Accounts use email/password credentials (12–128 character passwords), salted scrypt password hashes, and revocable 30-day database sessions. Only a hash of each random session token is stored. Cookies are HttpOnly, SameSite=Lax, and Secure on HTTPS. Signout revokes the current session; signin replaces the browser's previous account session. Email verification and password recovery are not included in this initial account flow.
+
+Set `AUTH_ORIGIN` to the exact public web origin, such as `https://sonavra.example`, in production. It must use HTTPS in production and excludes a trailing slash or path. Development defaults to `http://localhost:$WEB_PORT` (port 3000 when unset). Account mutations require JSON and an Origin matching this value. Browser requests use `/api/auth/*` on Next.js; the API remains internal. Set the internal API origin/port consistently during both web build and startup, because Next.js embeds API rewrites in the build. Apply the new database migration with `pnpm db:deploy` and regenerate the client with `pnpm db:generate`.
+
+Account HTTP/database integration tests run when `DATABASE_URL` is set (as in CI). Locally, run `pnpm exec dotenv -e .env -e .env.defaults -- pnpm --filter @sonavra/api test` after applying migrations.
 
 ## Git hooks
 

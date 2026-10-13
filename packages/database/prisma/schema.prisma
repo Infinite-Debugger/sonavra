@@ -24,11 +24,25 @@ enum TranscriptionJobStatus {
 }
 
 model User {
-  id         String      @id @default(uuid()) @db.Uuid
-  email      String      @unique
-  recordings Recording[]
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id           String           @id @default(uuid()) @db.Uuid
+  email        String           @unique
+  passwordHash String?
+  sessions     AccountSession[]
+  recordings   Recording[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+model AccountSession {
+  id        String   @id @default(uuid()) @db.Uuid
+  tokenHash String   @unique
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model GuestSession {

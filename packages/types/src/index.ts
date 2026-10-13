@@ -71,3 +71,5 @@ export interface UpdateTranscriptSpeakerRequest {
   guestSessionId: string;
   displayName: string;
 }
+export type AccountUser = { id: string; email: string };
+export type AccountSessionResponse = { user: AccountUser | null };
