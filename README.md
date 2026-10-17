@@ -38,7 +38,9 @@ Within `apps/web`, keep route entry points, layouts, and global assets in `app`,
 
 ## Accounts
 
-Signup, signin, and signout are optional; uploading and reviewing guest recordings remain available without an account. `/account` requires a valid server-verified session. Authentication never clears the browser's guest session or claims guest recordings; recording claims and the account library are separate features.
+Signup, signin, and signout are optional; uploading and reviewing guest recordings remain available without an account. `/account` requires a valid server-verified session. Signing up from a guest browser keeps eligible guest recordings in the new account. Existing users can select **Save to account** after a transcription finishes. The account library is a separate feature.
+
+Claims use the existing opaque guest-session ID as a bearer credential and the server-verified account session as the destination owner. They transfer all unexpired recordings in that guest session whose uploads have finished, preserving transcripts, edits, and jobs. In-progress uploads remain guest-owned. The conditional ownership update is atomic and safe to retry; a retry reports zero newly claimed recordings. Claimed recordings have no guest expiry or guest ownership, survive removal of the guest session, and require the owning account session for viewing, editing, obtaining media URLs, and retries. Signing out preserves the browser's guest session but does not restore guest access to claimed recordings. Previously issued media URLs remain valid until their existing expiry.
 
 Accounts use email/password credentials (12–128 character passwords), salted scrypt password hashes, and revocable 30-day database sessions. Only a hash of each random session token is stored. Cookies are HttpOnly, SameSite=Lax, and Secure on HTTPS. Signout revokes the current session; signin replaces the browser's previous account session. Email verification and password recovery are not included in this initial account flow.
 

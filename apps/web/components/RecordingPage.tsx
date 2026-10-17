@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createTranscriptDocx } from '@/lib/transcript/docx';
+import KeepRecordings from '@/components/KeepRecordings';
 import { useParams } from 'next/navigation';
 import {
   speakerName,
@@ -16,9 +17,9 @@ import type {
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
-async function getJson<T>(path: string, guestSessionId: string) {
+async function getJson<T>(path: string, guestSessionId?: string | null) {
   const response = await fetch(
-    `/api${path}?guestSessionId=${encodeURIComponent(guestSessionId)}`,
+    `/api${path}${guestSessionId ? `?guestSessionId=${encodeURIComponent(guestSessionId)}` : ''}`,
     { cache: 'no-store' },
   );
   if (!response.ok) throw new Error('Unable to load this recording.');
@@ -89,10 +90,6 @@ export default function RecordingPage() {
 
   useEffect(() => {
     const guestSessionId = localStorage.getItem('sonavraGuestSessionId');
-    if (!guestSessionId) {
-      setError('This guest recording is no longer available in this browser.');
-      return;
-    }
 
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
@@ -101,14 +98,14 @@ export default function RecordingPage() {
       try {
         const next = await getJson<RecordingStatusResponse>(
           `/recordings/${recordingId}/status`,
-          guestSessionId!,
+          guestSessionId,
         );
         if (stopped) return;
         setStatus(next);
         if (next.status === 'COMPLETED') {
           const result = await getJson<TranscriptResponse>(
             `/recordings/${recordingId}/transcript`,
-            guestSessionId!,
+            guestSessionId,
           );
           if (!stopped) setTranscript(result);
           return;
@@ -174,11 +171,6 @@ export default function RecordingPage() {
     payload: Record<string, string>,
   ) {
     const guestSessionId = localStorage.getItem('sonavraGuestSessionId');
-    if (!guestSessionId) {
-      setSaveState('error');
-      setSaveError('This guest recording is no longer available.');
-      return;
-    }
 
     const currentTimer = saveTimers.current.get(key);
     if (currentTimer) clearTimeout(currentTimer);
@@ -188,7 +180,10 @@ export default function RecordingPage() {
     const timer = setTimeout(async () => {
       setSaveState('saving');
       try {
-        await patchJson(path, { ...payload, guestSessionId });
+        await patchJson(
+          path,
+          guestSessionId ? { ...payload, guestSessionId } : payload,
+        );
         saveTimers.current.delete(key);
         setSaveState(saveTimers.current.size ? 'dirty' : 'saved');
       } catch (cause) {
@@ -279,7 +274,6 @@ export default function RecordingPage() {
 
   async function retry() {
     const guestSessionId = localStorage.getItem('sonavraGuestSessionId');
-    if (!guestSessionId) return;
     setRetrying(true);
     try {
       const response = await fetch(
@@ -287,7 +281,7 @@ export default function RecordingPage() {
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ guestSessionId }),
+          body: JSON.stringify({ guestSessionId: guestSessionId ?? undefined }),
         },
       );
       if (!response.ok) throw new Error('Unable to retry transcription.');
@@ -353,6 +347,21 @@ export default function RecordingPage() {
                 {saveError} Your edit is still visible here so you can retry it.
               </p>
             )}
+            <KeepRecordings
+              recordingId={recordingId}
+              status={status}
+              onSaved={async () => {
+                const next = await getJson<RecordingStatusResponse>(
+                  `/recordings/${recordingId}/status`,
+                  localStorage.getItem('sonavraGuestSessionId'),
+                );
+                if (next.ownership !== 'account')
+                  throw new Error(
+                    'This recording could not be kept. Please try again.',
+                  );
+                setStatus(next);
+              }}
+            />
           </header>
 
           <div className="mb-6 flex flex-wrap items-center gap-3">
@@ -362,7 +371,7 @@ export default function RecordingPage() {
               placeholder="Search transcript"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className="min-w-0 flex-1 rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="w-full min-w-0 flex-none rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm sm:w-auto sm:flex-1 dark:border-zinc-700 dark:bg-zinc-900"
             />
             <button
               type="button"

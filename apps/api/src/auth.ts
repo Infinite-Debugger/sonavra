@@ -1,5 +1,10 @@
 import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { createDatabase, type PrismaClient } from '@sonavra/database';
+import {
+  claimGuestRecordings,
+  guestSessionFrom,
+  GuestClaimValidationError,
+} from './guest-claims.js';
 
 export const SESSION_COOKIE = 'sonavraAccountSession';
 const SESSION_SECONDS = 30 * 24 * 60 * 60;
@@ -115,10 +120,11 @@ export class AuthService {
 
   async signUp(body: unknown, previousToken?: string) {
     const { email, password } = validateCredentials(body);
+    const guestSessionId = guestSessionFrom(body);
     const passwordHash = await hashPassword(password);
     const token = randomBytes(32).toString('hex');
     try {
-      const user = await this.database.$transaction(async (tx) => {
+      const result = await this.database.$transaction(async (tx) => {
         const user = await tx.user.create({
           data: {
             email,
@@ -136,9 +142,12 @@ export class AuthService {
           await tx.accountSession.deleteMany({
             where: { tokenHash: tokenHash(previousToken) },
           });
-        return user;
+        const claim = guestSessionId
+          ? await claimGuestRecordings(tx, user.id, guestSessionId)
+          : { claimedCount: 0 };
+        return { user, ...claim };
       });
-      return { user, token };
+      return { ...result, token };
     } catch (error) {
       if (error instanceof Error && 'code' in error && error.code === 'P2002')
         throw new AuthError('An account with this email already exists.', 409);
@@ -180,6 +189,15 @@ export class AuthService {
     });
     if (!session || session.expiresAt <= new Date()) return null;
     return session.user;
+  }
+
+  async claimGuestWork(token: string | undefined, body: unknown) {
+    const user = await this.currentUser(token);
+    if (!user) throw new AuthError('Sign in to keep your recordings.', 401);
+    const guestSessionId = guestSessionFrom(body);
+    if (!guestSessionId)
+      throw new GuestClaimValidationError('A valid guest session is required.');
+    return claimGuestRecordings(this.database, user.id, guestSessionId);
   }
 
   async signOut(token?: string) {

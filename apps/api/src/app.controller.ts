@@ -3,7 +3,9 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
+  HttpException,
   NotFoundException,
   Param,
   Patch,
@@ -26,13 +28,37 @@ import {
   normalizeSpeakerName,
   TranscriptEditValidationError,
 } from './transcript-edits.js';
+import { AuthService, AuthError, validateAuthRequest } from './auth.js';
+import { recordingAccess } from './recording-access.js';
 
 const uploads = new UploadService();
 const database = createDatabase();
+const auth = new AuthService(database);
 const storage = createS3ObjectStorageFromEnv();
 
 @Controller()
 export class AppController {
+  async onModuleDestroy() {
+    await auth.close();
+  }
+  private async mutationAccess(
+    cookie: string | undefined,
+    guestSessionId: string | undefined,
+    origin: string | undefined,
+    contentType: string | undefined,
+  ) {
+    const access = await recordingAccess(auth, cookie, guestSessionId);
+    if (access.userId) {
+      try {
+        validateAuthRequest(origin, contentType);
+      } catch (error) {
+        if (error instanceof AuthError)
+          throw new HttpException(error.message, error.status);
+        throw error;
+      }
+    }
+    return access;
+  }
   @Get('health')
   health() {
     return { status: 'ok' };
@@ -69,10 +95,11 @@ export class AppController {
   async recordingStatus(
     @Param('recordingId') recordingId: string,
     @Query('guestSessionId') guestSessionId: string,
+    @Headers('cookie') cookie: string | undefined,
   ): Promise<RecordingStatusResponse> {
-    if (!guestSessionId) throw new NotFoundException('Recording not found');
+    const access = await recordingAccess(auth, cookie, guestSessionId);
     const recording = await database.recording.findFirst({
-      where: { id: recordingId, guestSessionId },
+      where: { id: recordingId, ...access.where },
       include: {
         transcriptionJobs: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
@@ -86,6 +113,8 @@ export class AppController {
       jobId: job?.id ?? null,
       retryable: job?.retryable ?? false,
       errorMessage: job?.status === 'FAILED' ? job.errorMessage : null,
+      ownership: recording.userId ? 'account' : 'guest',
+      canClaim: !recording.userId && Boolean(access.userId),
     };
   }
 
@@ -93,10 +122,11 @@ export class AppController {
   async transcript(
     @Param('recordingId') recordingId: string,
     @Query('guestSessionId') guestSessionId: string,
+    @Headers('cookie') cookie: string | undefined,
   ): Promise<TranscriptResponse> {
-    if (!guestSessionId) throw new NotFoundException('Transcript not found');
+    const access = await recordingAccess(auth, cookie, guestSessionId);
     const recording = await database.recording.findFirst({
-      where: { id: recordingId, guestSessionId },
+      where: { id: recordingId, ...access.where },
       include: {
         transcript: {
           include: {
@@ -141,10 +171,16 @@ export class AppController {
     @Param('recordingId') recordingId: string,
     @Param('segmentId') segmentId: string,
     @Body() body: UpdateTranscriptSegmentRequest,
+    @Headers('cookie') cookie: string | undefined,
+    @Headers('origin') origin: string | undefined,
+    @Headers('content-type') contentType: string | undefined,
   ) {
-    if (!body.guestSessionId) {
-      throw new NotFoundException('Transcript segment not found');
-    }
+    const access = await this.mutationAccess(
+      cookie,
+      body.guestSessionId,
+      origin,
+      contentType,
+    );
 
     let text: string;
     try {
@@ -160,7 +196,7 @@ export class AppController {
       where: {
         id: segmentId,
         transcript: {
-          recording: { id: recordingId, guestSessionId: body.guestSessionId },
+          recording: { id: recordingId, ...access.where },
         },
       },
       data: { text },
@@ -176,10 +212,16 @@ export class AppController {
     @Param('recordingId') recordingId: string,
     @Param('speakerId') speakerId: string,
     @Body() body: UpdateTranscriptSpeakerRequest,
+    @Headers('cookie') cookie: string | undefined,
+    @Headers('origin') origin: string | undefined,
+    @Headers('content-type') contentType: string | undefined,
   ) {
-    if (!body.guestSessionId) {
-      throw new NotFoundException('Transcript speaker not found');
-    }
+    const access = await this.mutationAccess(
+      cookie,
+      body.guestSessionId,
+      origin,
+      contentType,
+    );
 
     let displayName: string;
     try {
@@ -195,7 +237,7 @@ export class AppController {
       where: {
         id: speakerId,
         transcript: {
-          recording: { id: recordingId, guestSessionId: body.guestSessionId },
+          recording: { id: recordingId, ...access.where },
         },
       },
       data: { displayName },
@@ -211,12 +253,18 @@ export class AppController {
   async enqueueTranscription(
     @Param('recordingId') recordingId: string,
     @Body() body: { guestSessionId?: string },
+    @Headers('cookie') cookie: string | undefined,
+    @Headers('origin') origin: string | undefined,
+    @Headers('content-type') contentType: string | undefined,
   ) {
-    if (!body.guestSessionId) {
-      throw new NotFoundException('Recording not found');
-    }
+    const access = await this.mutationAccess(
+      cookie,
+      body.guestSessionId,
+      origin,
+      contentType,
+    );
     const recording = await database.recording.findFirst({
-      where: { id: recordingId, guestSessionId: body.guestSessionId },
+      where: { id: recordingId, ...access.where },
       select: { id: true },
     });
     if (!recording) throw new NotFoundException('Recording not found');
@@ -241,9 +289,14 @@ export class AppController {
   }
 
   @Get('transcription-jobs/:jobId')
-  async transcriptionJob(@Param('jobId') jobId: string) {
-    const job = await database.transcriptionJob.findUnique({
-      where: { id: jobId },
+  async transcriptionJob(
+    @Param('jobId') jobId: string,
+    @Query('guestSessionId') guestSessionId: string,
+    @Headers('cookie') cookie: string | undefined,
+  ) {
+    const access = await recordingAccess(auth, cookie, guestSessionId);
+    const job = await database.transcriptionJob.findFirst({
+      where: { id: jobId, recording: access.where },
       select: {
         id: true,
         recordingId: true,
