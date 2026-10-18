@@ -44,9 +44,14 @@ export default function AccountNavigation() {
         <div className="flex min-h-10 items-center gap-2" aria-busy={!loaded}>
           {loaded &&
             (user ? (
-              <Link className={linkClass} href="/account">
-                Account
-              </Link>
+              <>
+                <Link className={linkClass} href="/library">
+                  Library
+                </Link>
+                <Link className={linkClass} href="/account">
+                  Account
+                </Link>
+              </>
             ) : (
               <>
                 <Link className={linkClass} href={`/signin?next=${next}`}>

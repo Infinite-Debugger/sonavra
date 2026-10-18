@@ -7,6 +7,7 @@ it('returns only to known local routes after authentication', () => {
   assert.equal(safeReturnTo(recording), recording);
   assert.equal(safeReturnTo('/'), '/');
   assert.equal(safeReturnTo('/account'), '/account');
+  assert.equal(safeReturnTo('/library'), '/library');
   for (const path of [
     undefined,
     '//untrusted.example',
