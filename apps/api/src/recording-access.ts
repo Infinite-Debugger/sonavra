@@ -11,6 +11,7 @@ export async function recordingAccess(
   return {
     userId: user?.id,
     where: {
+      deletionRequestedAt: null,
       OR: [
         ...(user ? [{ userId: user.id }] : []),
         ...(isGuestSessionId(guestSessionId)

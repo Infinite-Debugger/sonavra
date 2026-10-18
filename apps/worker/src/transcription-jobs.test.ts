@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, before, beforeEach, test } from 'node:test';
+import { randomBytes } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 
 import { createDatabase, type PrismaClient } from '@sonavra/database';
 import type { ObjectStorage } from '@sonavra/storage';
@@ -14,6 +16,9 @@ import { TranscriptionJobProcessor } from './transcription-jobs.js';
 
 let database: PrismaClient;
 let guestSessionId: string;
+const testDatabase = `worker_test_${randomBytes(8).toString('hex')}`;
+let admin: PrismaClient;
+let testDatabaseCreated = false;
 
 const storage: ObjectStorage = {
   createObjectKey: () => 'recordings/test/source',
@@ -75,7 +80,18 @@ async function recording() {
 }
 
 before(async () => {
-  database = createDatabase();
+  const url = new URL(process.env.DATABASE_URL!);
+  admin = createDatabase(url.toString());
+  await admin.$executeRawUnsafe(`CREATE DATABASE "${testDatabase}"`);
+  testDatabaseCreated = true;
+  url.pathname = `/${testDatabase}`;
+  url.searchParams.set('schema', 'public');
+  execFileSync(
+    'pnpm',
+    ['--filter', '@sonavra/database', 'exec', 'prisma', 'migrate', 'deploy'],
+    { env: { ...process.env, DATABASE_URL: url.toString() }, stdio: 'pipe' },
+  );
+  database = createDatabase(url.toString());
   const guest = await database.guestSession.create({
     data: { expiresAt: new Date(Date.now() + 3600000) },
   });
@@ -91,8 +107,61 @@ beforeEach(async () => {
 });
 
 after(async () => {
-  await database.guestSession.deleteMany({ where: { id: guestSessionId } });
-  await database.$disconnect();
+  if (database) await database.$disconnect();
+  if (testDatabaseCreated)
+    await admin.$executeRawUnsafe(
+      `DROP DATABASE "${testDatabase}" WITH (FORCE)`,
+    );
+  if (admin) await admin.$disconnect();
+});
+
+test('does not persist a result after a recording is deleted during transcription', async () => {
+  const source = await recording();
+  const engine: TranscriptionEngine = {
+    name: 'deletion-test',
+    transcribe: async () => {
+      await database.recording.update({
+        where: { id: source.id },
+        data: { deletionRequestedAt: new Date() },
+      });
+      await database.recording.delete({ where: { id: source.id } });
+      return result;
+    },
+  };
+  const processor = new TranscriptionJobProcessor(
+    database,
+    storage,
+    preprocessor,
+    engine,
+  );
+  await processor.enqueue(source.id);
+  assert.equal(await processor.processNext(), true);
+  assert.equal(await database.transcript.count(), 0);
+  assert.equal(await database.transcriptionJob.count(), 0);
+});
+
+test('does not retry a job after deletion is requested during transcription', async () => {
+  const source = await recording();
+  const engine: TranscriptionEngine = {
+    name: 'deletion-test',
+    transcribe: async () => {
+      await database.recording.update({
+        where: { id: source.id },
+        data: { deletionRequestedAt: new Date() },
+      });
+      throw new Error('Synthetic engine failure');
+    },
+  };
+  const processor = new TranscriptionJobProcessor(
+    database,
+    storage,
+    preprocessor,
+    engine,
+  );
+  await processor.enqueue(source.id);
+  assert.equal(await processor.processNext(), true);
+  assert.equal(await processor.processNext(), false);
+  assert.equal(await database.transcript.count(), 0);
 });
 
 test('processes a queued job and persists normalized transcript data', async () => {

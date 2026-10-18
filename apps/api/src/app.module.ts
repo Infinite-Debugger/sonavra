@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller.js';
 import { AuthController } from './auth.controller.js';
+import { LibraryController } from './library.controller.js';
 
-@Module({ controllers: [AppController, AuthController] })
+@Module({ controllers: [AppController, AuthController, LibraryController] })
 export class AppModule {}
