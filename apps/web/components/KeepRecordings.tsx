@@ -63,6 +63,9 @@ export default function KeepRecordings({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
           Guest recording
+          {status.expiresAt
+            ? ` · Media and transcript expire ${new Date(status.expiresAt).toLocaleString()}`
+            : ''}
         </p>
         {status.canClaim ? (
           <button
