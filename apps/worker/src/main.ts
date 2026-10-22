@@ -6,6 +6,7 @@ import {
   DockerMediaPreprocessor,
 } from '@sonavra/transcription';
 
+import { GuestCleanup } from './guest-cleanup.js';
 import { TranscriptionJobProcessor } from './transcription-jobs.js';
 
 const database = createDatabase();
@@ -32,6 +33,24 @@ const processor = new TranscriptionJobProcessor(
 
 const pollMs = Number(process.env.SONAVRA_WORKER_POLL_MS ?? 1000);
 let stopping = false;
+const cleanup = new GuestCleanup(database, storage);
+let cleanupRun: Promise<void> | undefined;
+function sweep() {
+  if (stopping || cleanupRun) return;
+  cleanupRun = cleanup
+    .run()
+    .then((result) => {
+      if (result.deleted || result.failed || result.sessions)
+        console.log('guest cleanup', result);
+    })
+    .catch(() => {
+      console.error('guest cleanup failed; retrying on next sweep');
+    })
+    .finally(() => {
+      cleanupRun = undefined;
+    });
+}
+const cleanupTimer = setInterval(sweep, 60_000);
 
 async function run() {
   console.log(`${serviceName} worker ready`, {
@@ -39,6 +58,7 @@ async function run() {
     engine: engine.name,
   });
 
+  sweep();
   while (!stopping) {
     try {
       const processed = await processor.processNext();
@@ -50,11 +70,14 @@ async function run() {
       await new Promise((resolve) => setTimeout(resolve, pollMs));
     }
   }
+  clearInterval(cleanupTimer);
+  await cleanupRun;
+  await database.$disconnect();
 }
 
-async function shutdown() {
+function shutdown() {
   stopping = true;
-  await database.$disconnect();
+  clearInterval(cleanupTimer);
 }
 
 process.on('SIGINT', () => void shutdown());

@@ -20,6 +20,7 @@ import type {
   UpdateTranscriptSegmentRequest,
   UpdateTranscriptSpeakerRequest,
 } from '@sonavra/types';
+import { guestRetentionHours } from '@sonavra/config';
 import { createDatabase } from '@sonavra/database';
 import { createS3ObjectStorageFromEnv } from '@sonavra/storage';
 import { UploadService, UploadValidationError } from './uploads.js';
@@ -62,6 +63,11 @@ export class AppController {
   @Get('health')
   health() {
     return { status: 'ok' };
+  }
+
+  @Get('uploads/policy')
+  uploadPolicy() {
+    return { guestRetentionHours: guestRetentionHours() };
   }
 
   @Post('uploads')
@@ -115,6 +121,7 @@ export class AppController {
       errorMessage: job?.status === 'FAILED' ? job.errorMessage : null,
       ownership: recording.userId ? 'account' : 'guest',
       canClaim: !recording.userId && Boolean(access.userId),
+      expiresAt: recording.expiresAt?.toISOString() ?? null,
     };
   }
 
