@@ -38,7 +38,11 @@ Within `apps/web`, keep route entry points, layouts, and global assets in `app`,
 
 ## Accounts
 
-Signup, signin, and signout are optional; uploading and reviewing guest recordings remain available without an account. `/account` requires a valid server-verified session. Signing up from a guest browser keeps eligible guest recordings in the new account. Existing users can select **Save to account** after a transcription finishes. The account library is a separate feature.
+Signup, signin, and signout are optional; uploading and reviewing guest recordings remain available without an account. `/account` and `/library` require a valid server-verified session. Signing up from a guest browser keeps eligible guest recordings in the new account. Existing users can select **Save to account** after a transcription finishes.
+
+The library lists only the signed-in user's recordings, newest first, in pages of 25. Search matches recording titles and original filenames without regard to case. Titles can be renamed without changing the original filename. Processing states refresh while the library is open; completed items open in the transcript workspace.
+
+Deleting a recording requires confirmation and permanently removes its private source media, transcript, speakers, segments, and jobs. A deletion request immediately blocks workspace access and further worker writes. An in-flight transcription may finish, but its result is discarded and its temporary media files are removed by the worker's normal cleanup. If media cleanup fails, the library shows **Deletion pending** and deletion can be retried; cleanup is complete only after a successful response. Previously issued media URLs remain subject to object availability and their original expiry. Guest retention cleanup is tracked separately.
 
 Claims use the existing opaque guest-session ID as a bearer credential and the server-verified account session as the destination owner. They transfer all unexpired recordings in that guest session whose uploads have finished, preserving transcripts, edits, and jobs. In-progress uploads remain guest-owned. The conditional ownership update is atomic and safe to retry; a retry reports zero newly claimed recordings. Claimed recordings have no guest expiry or guest ownership, survive removal of the guest session, and require the owning account session for viewing, editing, obtaining media URLs, and retries. Signing out preserves the browser's guest session but does not restore guest access to claimed recordings. Previously issued media URLs remain valid until their existing expiry.
 
@@ -47,6 +51,8 @@ Accounts use email/password credentials (12–128 character passwords), salted s
 Set `AUTH_ORIGIN` to the exact public web origin, such as `https://sonavra.example`, in production. It must use HTTPS in production and excludes a trailing slash or path. Development defaults to `http://localhost:$WEB_PORT` (port 3000 when unset). Account mutations require JSON and an Origin matching this value. Browser requests use `/api/auth/*` on Next.js; the API remains internal. Set the internal API origin/port consistently during both web build and startup, because Next.js embeds API rewrites in the build. Apply the new database migration with `pnpm db:deploy` and regenerate the client with `pnpm db:generate`.
 
 Account HTTP/database integration tests run when `DATABASE_URL` is set (as in CI). Locally, run `pnpm exec dotenv -e .env -e .env.defaults -- pnpm --filter @sonavra/api test` after applying migrations.
+
+Library integration tests also require the local object-storage service. Worker integration tests create and remove a disposable database, so the test database role must have `CREATEDB` permission. The default local PostgreSQL and CI roles support this. Worker test cleanup never runs against the configured application database.
 
 ## Git hooks
 

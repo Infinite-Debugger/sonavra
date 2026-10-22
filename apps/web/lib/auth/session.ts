@@ -19,8 +19,8 @@ export async function currentUser() {
   return data.user;
 }
 
-export async function requireUser() {
+export async function requireUser(returnTo = '/account') {
   const user = await currentUser();
-  if (!user) redirect('/signin?next=/account');
+  if (!user) redirect(`/signin?next=${encodeURIComponent(returnTo)}`);
   return user;
 }

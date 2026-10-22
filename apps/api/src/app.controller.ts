@@ -143,6 +143,7 @@ export class AppController {
     return {
       recordingId,
       filename: recording.originalFilename,
+      title: recording.title,
       language: recording.transcript.language,
       durationMs: recording.durationMs,
       media: {

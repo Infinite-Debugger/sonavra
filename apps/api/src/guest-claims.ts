@@ -31,6 +31,7 @@ export async function claimGuestRecordings(
   // A conditional update transfers ownership atomically, including concurrent retries.
   const result = await database.recording.updateMany({
     where: {
+      deletionRequestedAt: null,
       guestSessionId,
       userId: null,
       expiresAt: { gt: now },

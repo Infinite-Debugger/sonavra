@@ -61,6 +61,8 @@ model Recording {
   user              User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
   guestSession      GuestSession?      @relation(fields: [guestSessionId], references: [id], onDelete: Cascade)
   originalFilename  String
+  title             String?
+  deletionRequestedAt DateTime?
   objectKey         String
   mimeType          String
   sizeBytes         BigInt

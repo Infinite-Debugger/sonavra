@@ -42,6 +42,7 @@ export interface RecordingStatusResponse {
 export interface TranscriptResponse {
   recordingId: string;
   filename: string;
+  title?: string | null;
   language: string | null;
   durationMs: number | null;
   media: {
@@ -76,3 +77,17 @@ export interface UpdateTranscriptSpeakerRequest {
 export type AccountUser = { id: string; email: string };
 export type AccountSessionResponse = { user: AccountUser | null };
 export type GuestClaimResponse = { claimedCount: number };
+export interface LibraryItem {
+  id: string;
+  title: string;
+  originalFilename: string;
+  status: RecordingJourneyStatus;
+  createdAt: string;
+  deletionPending: boolean;
+}
+export interface LibraryResponse {
+  items: LibraryItem[];
+  total: number;
+  page: number;
+  hasMore: boolean;
+}

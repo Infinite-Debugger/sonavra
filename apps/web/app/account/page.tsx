@@ -17,6 +17,12 @@ export default async function Account() {
         </dl>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <Link
+            href="/library"
+            className="rounded-sm text-sm font-medium text-emerald-700 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 dark:text-emerald-300"
+          >
+            Library
+          </Link>
+          <Link
             href="/"
             className="rounded-sm text-sm font-medium text-emerald-700 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 dark:text-emerald-300"
           >

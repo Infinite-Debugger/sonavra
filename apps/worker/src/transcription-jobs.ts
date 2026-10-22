@@ -57,7 +57,7 @@ export class TranscriptionJobProcessor {
   async enqueue(recordingId: string) {
     return this.database.$transaction(async (tx) => {
       const recording = await tx.recording.findUnique({
-        where: { id: recordingId },
+        where: { id: recordingId, deletionRequestedAt: null },
         select: { id: true, status: true },
       });
       if (!recording) throw new Error('Recording not found');
@@ -101,6 +101,7 @@ export class TranscriptionJobProcessor {
           OR ("status" = 'PROCESSING' AND "leaseExpiresAt" < NOW())
         )
         AND "attemptCount" < ${this.maxAttempts}
+        AND EXISTS (SELECT 1 FROM "Recording" WHERE "Recording"."id" = "TranscriptionJob"."recordingId" AND "deletionRequestedAt" IS NULL)
         ORDER BY "availableAt", "createdAt"
         FOR UPDATE SKIP LOCKED
         LIMIT 1
@@ -121,18 +122,20 @@ export class TranscriptionJobProcessor {
 
     const job = rows[0];
     if (job) {
-      await this.database.recording.update({
-        where: { id: job.recordingId },
+      const updated = await this.database.recording.updateMany({
+        where: { id: job.recordingId, deletionRequestedAt: null },
         data: { status: 'PROCESSING' },
       });
+      if (!updated.count) return undefined;
     }
     return job;
   }
 
   private async process(jobId: string, recordingId: string) {
-    const recording = await this.database.recording.findUniqueOrThrow({
-      where: { id: recordingId },
+    const recording = await this.database.recording.findFirst({
+      where: { id: recordingId, deletionRequestedAt: null },
     });
+    if (!recording) return;
     const workingDirectory = await mkdtemp(join(tmpdir(), 'sonavra-job-'));
     const sourcePath = join(workingDirectory, 'source-media');
 
@@ -172,6 +175,11 @@ export class TranscriptionJobProcessor {
     result: TranscriptionResult,
   ) {
     await this.database.$transaction(async (tx) => {
+      const active = await tx.recording.updateMany({
+        where: { id: recordingId, deletionRequestedAt: null },
+        data: { status: 'COMPLETED', durationMs: result.durationMs },
+      });
+      if (!active.count) return;
       const existing = await tx.transcript.findUnique({
         where: { recordingId },
         select: { id: true },
@@ -229,10 +237,11 @@ export class TranscriptionJobProcessor {
   }
 
   private async fail(jobId: string, recordingId: string, error: unknown) {
-    const job = await this.database.transcriptionJob.findUniqueOrThrow({
+    const job = await this.database.transcriptionJob.findUnique({
       where: { id: jobId },
       select: { attemptCount: true },
     });
+    if (!job) return;
     const engineError = isTranscriptionEngineError(error) ? error : undefined;
     const retryable = engineError?.retryable ?? true;
     const canRetry = retryable && job.attemptCount < this.maxAttempts;
@@ -242,8 +251,13 @@ export class TranscriptionJobProcessor {
         ? error.message.slice(0, 500)
         : 'Unknown worker failure';
 
-    await this.database.$transaction([
-      this.database.transcriptionJob.update({
+    await this.database.$transaction(async (tx) => {
+      const active = await tx.recording.updateMany({
+        where: { id: recordingId, deletionRequestedAt: null },
+        data: { status: canRetry ? 'QUEUED' : 'FAILED' },
+      });
+      if (!active.count) return;
+      await tx.transcriptionJob.update({
         where: { id: jobId },
         data: canRetry
           ? {
@@ -264,11 +278,7 @@ export class TranscriptionJobProcessor {
               leaseExpiresAt: null,
               completedAt: new Date(),
             },
-      }),
-      this.database.recording.update({
-        where: { id: recordingId },
-        data: { status: canRetry ? 'QUEUED' : 'FAILED' },
-      }),
-    ]);
+      });
+    });
   }
 }

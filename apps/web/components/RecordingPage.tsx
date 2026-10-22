@@ -138,7 +138,7 @@ export default function RecordingPage() {
 
   useEffect(() => {
     if (!transcript) return;
-    document.title = `${transcript.filename} · Sonavra`;
+    document.title = `${transcript.title ?? transcript.filename} · Sonavra`;
   }, [transcript]);
 
   const activeSegmentId = useMemo(() => {
@@ -334,7 +334,7 @@ export default function RecordingPage() {
               <SaveIndicator state={saveState} />
             </div>
             <h1 className="wrap-break-word text-2xl font-bold tracking-tight sm:text-4xl">
-              {transcript.filename}
+              {transcript.title ?? transcript.filename}
             </h1>
             <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
               Transcript
