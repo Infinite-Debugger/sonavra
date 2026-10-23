@@ -92,3 +92,14 @@ export interface LibraryResponse {
   page: number;
   hasMore: boolean;
 }
+
+export interface TranscriptSummaryResponse {
+  available: boolean;
+  summary: {
+    text: string;
+    keyPoints: string[];
+    actionItems: string[];
+    generatedAt: string;
+    stale: boolean;
+  } | null;
+}
