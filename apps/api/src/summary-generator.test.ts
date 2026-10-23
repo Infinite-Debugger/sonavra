@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  MAX_SUMMARY_SOURCE_CHARACTERS,
+  MAX_SUMMARY_SOURCE_BYTES,
   OllamaSummaryGenerator,
   SummaryError,
 } from './summary-generator.js';
@@ -77,9 +77,10 @@ test('bounds input and sanitizes runtime failures without echoing transcript con
   };
   const generator = new OllamaSummaryGenerator('test', undefined, request);
   await assert.rejects(
-    () => generator.generate('x'.repeat(MAX_SUMMARY_SOURCE_CHARACTERS + 1)),
+    () => generator.generate('x'.repeat(MAX_SUMMARY_SOURCE_BYTES + 1)),
     /24,000/,
   );
+  await assert.rejects(() => generator.generate('語'.repeat(8001)), /24,000/);
   await assert.rejects(() => generator.generate(' '), /no text/);
   assert.equal(calls, 0);
   await assert.rejects(

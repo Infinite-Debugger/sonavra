@@ -1,4 +1,4 @@
-export const MAX_SUMMARY_SOURCE_CHARACTERS = 24_000;
+export const MAX_SUMMARY_SOURCE_BYTES = 24_000;
 
 export type GeneratedSummary = {
   text: string;
@@ -77,9 +77,9 @@ export class OllamaSummaryGenerator implements SummaryGenerator {
       throw new SummaryError('Summary generation is currently unavailable.');
     if (!source.trim())
       throw new SummaryError('This transcript has no text to summarize.', 422);
-    if (source.length > MAX_SUMMARY_SOURCE_CHARACTERS)
+    if (Buffer.byteLength(source, 'utf8') > MAX_SUMMARY_SOURCE_BYTES)
       throw new SummaryError(
-        'This transcript exceeds the 24,000-character summary limit.',
+        'This transcript exceeds the 24,000-byte summary limit.',
         422,
       );
     try {
