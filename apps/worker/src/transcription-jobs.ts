@@ -5,7 +5,15 @@ import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 
-import type { PrismaClient } from '@sonavra/database';
+import {
+  logEvent,
+  withLogContext,
+  publicTranscriptionError,
+} from '@sonavra/config';
+import {
+  createQueuedTranscriptionJob,
+  type PrismaClient,
+} from '@sonavra/database';
 import type { ObjectStorage } from '@sonavra/storage';
 import {
   TranscriptionEngineError,
@@ -38,6 +46,14 @@ export interface TranscriptionJobProcessorOptions {
 }
 
 export class TranscriptionJobProcessor {
+  readonly metrics = {
+    active: 0,
+    completed: 0,
+    failed: 0,
+    retried: 0,
+    discarded: 0,
+    totalDurationMs: 0,
+  };
   private readonly maxAttempts: number;
   private readonly leaseMs: number;
   private readonly retryDelayMs: number;
@@ -70,9 +86,7 @@ export class TranscriptionJobProcessor {
       });
       if (active) return active;
 
-      const job = await tx.transcriptionJob.create({
-        data: { recordingId, status: 'QUEUED', availableAt: new Date() },
-      });
+      const job = await createQueuedTranscriptionJob(tx, recordingId);
       await tx.recording.update({
         where: { id: recordingId },
         data: { status: 'QUEUED' },
@@ -84,14 +98,24 @@ export class TranscriptionJobProcessor {
   async processNext(): Promise<boolean> {
     const job = await this.claimNext();
     if (!job) return false;
-    await this.process(job.id, job.recordingId);
+    const recording = await this.database.recording.findUnique({
+      where: { id: job.recordingId },
+      select: { requestId: true },
+    });
+    await withLogContext(
+      {
+        requestId: recording?.requestId ?? job.id,
+        recordingId: job.recordingId,
+        jobId: job.id,
+      },
+      () => this.process(job.id, job.recordingId, job.attemptCount),
+    );
     return true;
   }
 
   private async claimNext() {
-    const leaseExpiresAt = new Date(Date.now() + this.leaseMs);
     const rows = await this.database.$queryRaw<
-      Array<{ id: string; recordingId: string }>
+      Array<{ id: string; recordingId: string; attemptCount: number }>
     >`
       WITH candidate AS (
         SELECT "id"
@@ -110,14 +134,14 @@ export class TranscriptionJobProcessor {
       SET "status" = 'PROCESSING',
           "attemptCount" = job."attemptCount" + 1,
           "startedAt" = NOW(),
-          "leaseExpiresAt" = ${leaseExpiresAt},
+          "leaseExpiresAt" = NOW() + (${this.leaseMs} * INTERVAL '1 millisecond'),
           "errorCode" = NULL,
           "errorMessage" = NULL,
           "retryable" = false,
           "updatedAt" = NOW()
       FROM candidate
       WHERE job."id" = candidate."id"
-      RETURNING job."id", job."recordingId"
+      RETURNING job."id", job."recordingId", job."attemptCount"
     `;
 
     const job = rows[0];
@@ -131,12 +155,34 @@ export class TranscriptionJobProcessor {
     return job;
   }
 
-  private async process(jobId: string, recordingId: string) {
+  private async process(
+    jobId: string,
+    recordingId: string,
+    attemptCount: number,
+  ) {
     const recording = await this.database.recording.findFirst({
       where: { id: recordingId, deletionRequestedAt: null },
     });
     if (!recording) return;
     const workingDirectory = await mkdtemp(join(tmpdir(), 'sonavra-job-'));
+    this.metrics.active++;
+    const started = performance.now();
+    logEvent('worker', 'job_started', { attemptCount });
+    let renewing: Promise<unknown> | undefined;
+    const heartbeat = setInterval(
+      () => {
+        if (renewing) return;
+        renewing = this.database
+          .$executeRaw`UPDATE "TranscriptionJob" SET "leaseExpiresAt" = NOW() + (${this.leaseMs} * INTERVAL '1 millisecond') WHERE "id" = ${jobId}::uuid AND "status" = 'PROCESSING' AND "attemptCount" = ${attemptCount}`
+          .catch(() => {
+            logEvent('worker', 'lease_renewal_failed');
+          })
+          .finally(() => {
+            renewing = undefined;
+          });
+      },
+      Math.max(10, Math.floor(this.leaseMs / 3)),
+    );
     const sourcePath = join(workingDirectory, 'source-media');
 
     try {
@@ -151,20 +197,49 @@ export class TranscriptionJobProcessor {
         createWriteStream(sourcePath, { mode: 0o600 }),
       );
 
+      logEvent('worker', 'preprocessing_started');
       const normalized = await this.preprocessor.normalize(sourcePath);
+      logEvent('worker', 'preprocessing_completed', {
+        durationMs: Math.round(performance.now() - started),
+      });
       try {
         const result = await this.engine.transcribe({
           source: { kind: 'file', path: normalized.path },
           detectLanguage: true,
           diarization: true,
+          correlation: {
+            requestId: recording.requestId ?? jobId,
+            recordingId,
+            jobId,
+          },
         });
-        await this.persistResult(jobId, recordingId, result);
+        if (result.telemetry)
+          logEvent('runtime', 'transcription_completed', result.telemetry);
+        const saved = await this.persistResult(
+          jobId,
+          recordingId,
+          result,
+          attemptCount,
+        );
+        if (saved) {
+          this.metrics.completed++;
+          logEvent('worker', 'job_completed');
+        } else {
+          this.metrics.discarded++;
+          logEvent('worker', 'job_discarded');
+        }
       } finally {
         await normalized.dispose();
       }
     } catch (error) {
-      await this.fail(jobId, recordingId, error);
+      await this.fail(jobId, recordingId, error, attemptCount);
     } finally {
+      clearInterval(heartbeat);
+      await renewing;
+      this.metrics.active--;
+      const durationMs = Math.round(performance.now() - started);
+      this.metrics.totalDurationMs += durationMs;
+      logEvent('worker', 'job_finished', { durationMs });
       await rm(workingDirectory, { recursive: true, force: true });
     }
   }
@@ -173,13 +248,23 @@ export class TranscriptionJobProcessor {
     jobId: string,
     recordingId: string,
     result: TranscriptionResult,
+    attemptCount: number,
   ) {
-    await this.database.$transaction(async (tx) => {
+    return this.database.$transaction(async (tx) => {
+      const parents = await tx.$queryRaw<
+        Array<{ id: string }>
+      >`SELECT "id" FROM "Recording" WHERE "id" = ${recordingId}::uuid AND "deletionRequestedAt" IS NULL FOR UPDATE`;
+      if (!parents.length) return false;
+      const leased = await tx.transcriptionJob.updateMany({
+        where: { id: jobId, status: 'PROCESSING', attemptCount },
+        data: { provider: result.engine },
+      });
+      if (!leased.count) return false;
       const active = await tx.recording.updateMany({
         where: { id: recordingId, deletionRequestedAt: null },
         data: { status: 'COMPLETED', durationMs: result.durationMs },
       });
-      if (!active.count) return;
+      if (!active.count) return false;
       const existing = await tx.transcript.findUnique({
         where: { recordingId },
         select: { id: true },
@@ -233,25 +318,40 @@ export class TranscriptionJobProcessor {
           completedAt: new Date(),
         },
       });
+      return true;
     });
   }
 
-  private async fail(jobId: string, recordingId: string, error: unknown) {
+  private async fail(
+    jobId: string,
+    recordingId: string,
+    error: unknown,
+    attemptCount: number,
+  ) {
     const job = await this.database.transcriptionJob.findUnique({
       where: { id: jobId },
       select: { attemptCount: true },
     });
-    if (!job) return;
+    if (!job || job.attemptCount !== attemptCount) return;
     const engineError = isTranscriptionEngineError(error) ? error : undefined;
     const retryable = engineError?.retryable ?? true;
     const canRetry = retryable && job.attemptCount < this.maxAttempts;
     const errorCode = engineError?.code ?? 'worker_error';
-    const errorMessage =
-      error instanceof Error
-        ? error.message.slice(0, 500)
-        : 'Unknown worker failure';
+    const errorMessage = publicTranscriptionError(errorCode);
 
     await this.database.$transaction(async (tx) => {
+      const parents = await tx.$queryRaw<
+        Array<{ id: string }>
+      >`SELECT "id" FROM "Recording" WHERE "id" = ${recordingId}::uuid AND "deletionRequestedAt" IS NULL FOR UPDATE`;
+      if (!parents.length) return;
+      const leased = await tx.transcriptionJob.updateMany({
+        where: { id: jobId, status: 'PROCESSING', attemptCount },
+        data: { errorCode, errorMessage },
+      });
+      if (!leased.count) return;
+      const [clock] = await tx.$queryRaw<
+        Array<{ now: Date }>
+      >`SELECT NOW() AS now`;
       const active = await tx.recording.updateMany({
         where: { id: recordingId, deletionRequestedAt: null },
         data: { status: canRetry ? 'QUEUED' : 'FAILED' },
@@ -266,7 +366,7 @@ export class TranscriptionJobProcessor {
               errorCode,
               errorMessage,
               availableAt: new Date(
-                Date.now() + this.retryDelayMs * job.attemptCount,
+                clock!.now.getTime() + this.retryDelayMs * job.attemptCount,
               ),
               leaseExpiresAt: null,
             }
@@ -278,6 +378,12 @@ export class TranscriptionJobProcessor {
               leaseExpiresAt: null,
               completedAt: new Date(),
             },
+      });
+      if (canRetry) this.metrics.retried++;
+      else this.metrics.failed++;
+      logEvent('worker', canRetry ? 'job_retried' : 'job_failed', {
+        errorCode,
+        attemptCount,
       });
     });
   }

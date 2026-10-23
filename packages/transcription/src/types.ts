@@ -13,6 +13,7 @@ export interface TranscriptionRequest {
   language?: string;
   detectLanguage?: boolean;
   diarization?: boolean;
+  correlation?: { requestId?: string; recordingId: string; jobId: string };
 }
 
 export interface TranscriptSpeaker {
@@ -30,6 +31,12 @@ export interface TranscriptSegment {
 
 export interface TranscriptionResult {
   engine: string;
+  telemetry?: {
+    durationMs: number;
+    cpuMs: number;
+    peakMemoryBytes: number;
+    gpuMemoryBytes: number;
+  };
   language?: string;
   durationMs?: number;
   speakers: TranscriptSpeaker[];

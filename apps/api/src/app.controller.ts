@@ -20,8 +20,15 @@ import type {
   UpdateTranscriptSegmentRequest,
   UpdateTranscriptSpeakerRequest,
 } from '@sonavra/types';
-import { guestRetentionHours } from '@sonavra/config';
-import { createDatabase } from '@sonavra/database';
+import {
+  guestRetentionHours,
+  logEvent,
+  publicTranscriptionError,
+} from '@sonavra/config';
+import {
+  createDatabase,
+  createQueuedTranscriptionJob,
+} from '@sonavra/database';
 import { createS3ObjectStorageFromEnv } from '@sonavra/storage';
 import { UploadService, UploadValidationError } from './uploads.js';
 import {
@@ -118,7 +125,10 @@ export class AppController {
       status: recording.status as RecordingStatusResponse['status'],
       jobId: job?.id ?? null,
       retryable: job?.retryable ?? false,
-      errorMessage: job?.status === 'FAILED' ? job.errorMessage : null,
+      errorMessage:
+        job?.status === 'FAILED'
+          ? publicTranscriptionError(job.errorCode)
+          : null,
       ownership: recording.userId ? 'account' : 'guest',
       canClaim: !recording.userId && Boolean(access.userId),
       expiresAt: recording.expiresAt?.toISOString() ?? null,
@@ -283,9 +293,7 @@ export class AppController {
       });
       if (active) return active;
 
-      const created = await tx.transcriptionJob.create({
-        data: { recordingId, status: 'QUEUED', availableAt: new Date() },
-      });
+      const created = await createQueuedTranscriptionJob(tx, recordingId);
       await tx.recording.update({
         where: { id: recordingId },
         data: { status: 'QUEUED' },
@@ -293,6 +301,7 @@ export class AppController {
       return created;
     });
 
+    logEvent('api', 'job_queued', { recordingId, jobId: job.id });
     return { jobId: job.id, status: job.status };
   }
 
@@ -319,6 +328,11 @@ export class AppController {
       },
     });
     if (!job) throw new NotFoundException('Transcription job not found');
-    return job;
+    return {
+      ...job,
+      errorMessage: job.errorMessage
+        ? publicTranscriptionError(job.errorCode)
+        : null,
+    };
   }
 }
