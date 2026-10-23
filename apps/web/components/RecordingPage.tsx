@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createTranscriptDocx } from '@/lib/transcript/docx';
+import TranscriptSummary from '@/components/TranscriptSummary';
 import KeepRecordings from '@/components/KeepRecordings';
 import { useParams } from 'next/navigation';
 import {
@@ -83,6 +84,7 @@ export default function RecordingPage() {
   const [currentMs, setCurrentMs] = useState(0);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [saveError, setSaveError] = useState('');
+  const [savedRevision, setSavedRevision] = useState(0);
   const [error, setError] = useState('');
   const [retrying, setRetrying] = useState(false);
   const [search, setSearch] = useState('');
@@ -186,6 +188,7 @@ export default function RecordingPage() {
         );
         saveTimers.current.delete(key);
         setSaveState(saveTimers.current.size ? 'dirty' : 'saved');
+        setSavedRevision((revision) => revision + 1);
       } catch (cause) {
         saveTimers.current.delete(key);
         setSaveState('error');
@@ -363,6 +366,16 @@ export default function RecordingPage() {
               }}
             />
           </header>
+
+          <TranscriptSummary
+            recordingId={recordingId}
+            revision={savedRevision}
+            hasUnsavedChanges={
+              saveState === 'dirty' ||
+              saveState === 'saving' ||
+              saveState === 'error'
+            }
+          />
 
           <div className="mb-6 flex flex-wrap items-center gap-3">
             <input
