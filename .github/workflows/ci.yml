@@ -74,6 +74,9 @@ jobs:
       - name: Apply database migrations
         run: pnpm db:deploy
 
+      - name: Check private service ingress
+        run: pnpm check:ingress
+
       - name: Build
         run: pnpm build
 
