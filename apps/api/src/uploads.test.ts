@@ -46,3 +46,17 @@ describe('public upload validation', () => {
     );
   });
 });
+
+describe('guest retention configuration', () => {
+  it('defaults to 24 hours and rejects invalid windows', async () => {
+    const { guestRetentionHours } = await import('@sonavra/config');
+    assert.equal(guestRetentionHours('24'), 24);
+    assert.equal(guestRetentionHours('48'), 48);
+    for (const value of ['', '0', '-1', '1.5', 'invalid', '8761']) {
+      assert.throws(
+        () => guestRetentionHours(value),
+        /SONAVRA_GUEST_RETENTION_HOURS/,
+      );
+    }
+  });
+});

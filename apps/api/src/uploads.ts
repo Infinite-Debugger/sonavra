@@ -1,3 +1,4 @@
+import { guestRetentionHours } from '@sonavra/config';
 import { createDatabase, type PrismaClient } from '@sonavra/database';
 import {
   createS3ObjectStorageFromEnv,
@@ -10,7 +11,6 @@ import type {
 } from '@sonavra/types';
 
 export const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;
-export const GUEST_RETENTION_MS = 24 * 60 * 60 * 1000;
 const SUPPORTED_MIME_TYPES = new Set([
   'application/ogg',
   'audio/mp4',
@@ -61,18 +61,33 @@ export class UploadService {
     input: CreateUploadRequest,
   ): Promise<CreateUploadResponse> {
     const media = validateUploadInput(input);
-    const expiresAt = new Date(Date.now() + GUEST_RETENTION_MS);
-    const guest = input.guestSessionId
+    const expiresAt = new Date(
+      Date.now() + guestRetentionHours() * 60 * 60 * 1000,
+    );
+    const existingGuest = input.guestSessionId
       ? await this.database.guestSession.findUnique({
           where: { id: input.guestSessionId },
         })
-      : await this.database.guestSession.create({ data: { expiresAt } });
+      : null;
+    const guest =
+      existingGuest && existingGuest.expiresAt > new Date()
+        ? existingGuest
+        : await this.database.guestSession.create({ data: { expiresAt } });
 
     if (!guest || guest.expiresAt <= new Date()) {
       throw new UploadValidationError('Guest session is invalid or expired.');
     }
 
-    const upload = await this.storage.presignUpload(media.mimeType);
+    const upload = await this.storage.presignUpload(
+      media.mimeType,
+      Math.max(
+        1,
+        Math.min(
+          900,
+          Math.floor((guest.expiresAt.getTime() - Date.now()) / 1000),
+        ),
+      ),
+    );
     const recording = await this.database.recording.create({
       data: {
         guestSessionId: guest.id,
@@ -103,7 +118,7 @@ export class UploadService {
     guestSessionId: string,
   ): Promise<CompleteUploadResponse> {
     const recording = await this.database.recording.findFirst({
-      where: { id: recordingId, guestSessionId },
+      where: { id: recordingId, guestSessionId, deletionRequestedAt: null },
     });
 
     if (

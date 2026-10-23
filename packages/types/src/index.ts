@@ -37,6 +37,7 @@ export interface RecordingStatusResponse {
   errorMessage: string | null;
   ownership: 'guest' | 'account';
   canClaim: boolean;
+  expiresAt: string | null;
 }
 
 export interface TranscriptResponse {

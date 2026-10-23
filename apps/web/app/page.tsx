@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   CompleteUploadResponse,
   CreateUploadResponse,
@@ -69,6 +69,15 @@ function putWithProgress(
 }
 
 export default function Home() {
+  const [retentionHours, setRetentionHours] = useState<number | null>(null);
+  useEffect(() => {
+    void fetch('/api/uploads/policy')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((policy: { guestRetentionHours: number } | null) => {
+        if (policy) setRetentionHours(policy.guestRetentionHours);
+      })
+      .catch(() => undefined);
+  }, []);
   const inputRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<UploadState>('idle');
   const [progress, setProgress] = useState(0);
@@ -239,7 +248,11 @@ export default function Home() {
         )}
 
         <p className="mt-5 text-sm text-zinc-500 dark:text-zinc-500">
-          No account required. Guest uploads expire after 24 hours.
+          No account required.{' '}
+          {retentionHours === null
+            ? 'Guest recordings and transcripts are kept temporarily.'
+            : `Guest recordings and transcripts expire within ${retentionHours} ${retentionHours === 1 ? 'hour' : 'hours'}.`}{' '}
+          Save to an account before expiry to keep your work.
         </p>
       </section>
     </main>
