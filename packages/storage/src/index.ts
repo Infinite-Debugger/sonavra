@@ -171,11 +171,20 @@ export class S3ObjectStorage implements ObjectStorage {
   async downloadObject(key: string) {
     this.validateKey(key);
     const { url } = this.presign('GET', key, 60, {}, this.endpoint);
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(60_000) });
     if (!response.ok) {
       throw new Error(`S3 download failed with status ${response.status}`);
     }
     return response;
+  }
+
+  async checkReadiness() {
+    const { url } = this.presign('HEAD', undefined, 30, {}, this.endpoint);
+    const response = await fetch(url, {
+      method: 'HEAD',
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!response.ok) throw new Error('Private storage is unavailable');
   }
 
   async ensureBucket() {

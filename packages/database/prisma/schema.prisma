@@ -63,6 +63,7 @@ model Recording {
   originalFilename  String
   title             String?
   deletionRequestedAt DateTime?
+  requestId         String?
   objectKey         String
   mimeType          String
   sizeBytes         BigInt
@@ -154,4 +155,12 @@ model TranscriptSummary {
   sourceHash   String
   model        String
   generatedAt  DateTime   @default(now())
+}
+
+model RequestRateLimit {
+  key       String   @id
+  hits      Int
+  expiresAt DateTime
+
+  @@index([expiresAt])
 }

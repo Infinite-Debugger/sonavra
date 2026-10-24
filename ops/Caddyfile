@@ -1,0 +1,19 @@
+{$SONAVRA_DOMAIN} {
+	@media {
+		path /{$S3_BUCKET:sonavra}/recordings/*
+		method GET HEAD PUT
+	}
+	handle @media {
+		request_body {
+			max_size 524288000
+		}
+		reverse_proxy 127.0.0.1:9000 {
+			header_up Host {http.request.host}
+		}
+	}
+	handle {
+		reverse_proxy 127.0.0.1:3000 {
+			header_up X-Forwarded-For {http.request.remote.host}
+		}
+	}
+}

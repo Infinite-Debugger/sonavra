@@ -41,6 +41,10 @@ GPU execution is configured as CUDA with float16 compute. Host NVIDIA drivers an
 
 ## Readiness
 
-`runtime_check.py` exits non-zero when FFmpeg, Python inference dependencies, or the configured local diarization model are unavailable. This is suitable for container health/readiness wiring.
+`runtime_check.py` loads the configured Whisper and local diarization models with offline Hugging Face access and verifies the configured CPU/CUDA device. It returns only boolean component checks and exits non-zero for missing caches, load failures, missing dependencies or an unavailable device. Probes never download models or print underlying diagnostic text. Provision the cache and diarization directory before starting a production worker.
+
+`--components-only` checks installed dependencies without loading models. Root development Compose uses this lightweight check so provisioning can run in a newly created container; it is not proof of inference readiness. The worker exposes strict model readiness on its protected `/ready` endpoint and does not claim jobs while unready or probing. Model probes run at startup and during idle maintenance, with a 55-second process deadline; a large model that cannot load within that deadline remains unready. Existing CPU/GPU packaging and model provisioning commands above remain the source of model artifacts.
+
+Docker inference runs with offline model access. Missing diarization configuration fails explicitly instead of silently removing speaker labels. Normalization accepts at most `SONAVRA_MAX_DURATION_SECONDS` (four hours by default); FFmpeg limits decoded output before checking duration. Each normalization and inference command has a five-minute deadline. Completed runtime results contain processing duration, CPU time, peak resident memory and CUDA peak allocation where applicable; transcripts and raw errors are excluded from operational logs.
 
 A clean runtime must not require OpenAI, Deepgram, AssemblyAI, pyannoteAI, or another hosted inference credential.

@@ -17,12 +17,13 @@
     "db:deploy": "dotenv -e .env -e .env.defaults -- pnpm --filter @sonavra/database db:deploy",
     "db:studio": "dotenv -e .env -e .env.defaults -- pnpm --filter @sonavra/database db:studio",
     "build": "pnpm -r --if-present build",
-    "test": "pnpm -r --if-present test",
+    "test": "pnpm -r --if-present test && node --test scripts/*.test.mjs",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "check:ingress": "docker compose config --format json | node scripts/check-ingress.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.36.0",

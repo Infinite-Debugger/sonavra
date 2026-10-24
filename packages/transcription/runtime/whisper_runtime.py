@@ -1,5 +1,8 @@
 import argparse
 import json
+import os
+import resource
+import time
 import sys
 from pathlib import Path
 
@@ -60,6 +63,7 @@ def diarize(media: Path, model_path: str, device: str, min_speakers: int | None,
 
 
 def main() -> None:
+    started = time.monotonic()
     args = parse_args()
     media = Path(args.media)
     if not media.is_file():
@@ -70,6 +74,7 @@ def main() -> None:
         device=args.device,
         compute_type=args.compute_type,
         download_root=args.model_cache,
+        local_files_only=os.environ.get("HF_HUB_OFFLINE") == "1",
     )
 
     language = None if args.detect_language else args.language
@@ -107,10 +112,17 @@ def main() -> None:
             }
         )
 
+    print(json.dumps({"event": "transcription_completed", "requestId": os.environ.get("SONAVRA_REQUEST_ID"), "recordingId": os.environ.get("SONAVRA_RECORDING_ID"), "jobId": os.environ.get("SONAVRA_JOB_ID")}), file=sys.stderr)
     print(
         json.dumps(
             {
                 "engine": "faster-whisper",
+                "telemetry": {
+                    "durationMs": round((time.monotonic() - started) * 1000),
+                    "cpuMs": round((resource.getrusage(resource.RUSAGE_SELF).ru_utime + resource.getrusage(resource.RUSAGE_SELF).ru_stime) * 1000),
+                    "peakMemoryBytes": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * (1 if sys.platform == "darwin" else 1024),
+                    "gpuMemoryBytes": torch.cuda.max_memory_allocated() if args.device == "cuda" else 0,
+                },
                 "language": info.language,
                 "durationMs": round(info.duration * 1000),
                 "speakers": speakers,
@@ -124,5 +136,5 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as error:
-        print(json.dumps({"error": str(error), "type": type(error).__name__}), file=sys.stderr)
+        print(json.dumps({"event": "transcription_failed", "type": type(error).__name__}), file=sys.stderr)
         sys.exit(1)

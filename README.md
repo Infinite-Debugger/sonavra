@@ -70,6 +70,10 @@ Guest media and transcripts expire within 24 hours by default, measured from cre
 
 Keep the worker running: it sweeps on startup and every minute independently of transcription, processing up to 100 expired recordings per sweep. Cleanup atomically marks expired guest recordings for deletion before removing private source media and then the recording, transcript, speakers, segments and jobs. Claimed account recordings are excluded. Storage or database failures leave the record for retry on the next sweep; empty expired guest sessions are removed only after their recordings are gone. Expired data is immediately inaccessible through the application even if physical cleanup is delayed. An active transcription discards its result after deletion is marked and removes its temporary files when processing finishes.
 
+## Production operations
+
+See [the production operations guide](ops/README.md) for private ingress, configuration checks, local model provisioning, operational health, JSON logs and public-endpoint limits. API and worker diagnostics distinguish service liveness from dependency/model readiness. Production startup rejects local default credentials and an externally bound API. `pnpm check:ingress` verifies Compose port bindings and runs in CI.
+
 ## Git hooks
 
 `pnpm install` configures the repository Git hooks through Husky. Before each commit, lint-staged runs ESLint and Prettier only against relevant staged files. Full build, test, typecheck, lint, and formatting verification remains in CI.

@@ -446,3 +446,89 @@ test('a claim that wins before the cleanup marker protects the media', async () 
     await database.user.delete({ where: { id: user.id } });
   }
 });
+
+test('renews active leases and carries the original upload correlation into inference', async () => {
+  const { randomUUID } = await import('node:crypto');
+  const source = await recording();
+  const requestId = randomUUID();
+  await database.recording.update({
+    where: { id: source.id },
+    data: { requestId },
+  });
+  let initialLease: Date | null = null;
+  const engine: TranscriptionEngine = {
+    name: 'lease-test',
+    transcribe: async (request) => {
+      assert.equal(request.correlation?.requestId, requestId);
+      assert.equal(request.correlation?.recordingId, source.id);
+      const initial = await database.transcriptionJob.findUniqueOrThrow({
+        where: { id: request.correlation!.jobId },
+      });
+      initialLease = initial.leaseExpiresAt;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      const renewed = await database.transcriptionJob.findUniqueOrThrow({
+        where: { id: initial.id },
+      });
+      assert.ok(renewed.leaseExpiresAt! > initialLease!);
+      return result;
+    },
+  };
+  const processor = new TranscriptionJobProcessor(
+    database,
+    storage,
+    preprocessor,
+    engine,
+    { leaseMs: 200 },
+  );
+  await processor.enqueue(source.id);
+  assert.equal(await processor.processNext(), true);
+  assert.equal(processor.metrics.completed, 1);
+  assert.equal(processor.metrics.active, 0);
+});
+
+test('discards stale attempts and keeps runtime diagnostics out of persisted errors', async () => {
+  const source = await recording();
+  const staleEngine: TranscriptionEngine = {
+    name: 'stale-test',
+    transcribe: async (request) => {
+      await database.transcriptionJob.update({
+        where: { id: request.correlation!.jobId },
+        data: { attemptCount: { increment: 1 } },
+      });
+      return result;
+    },
+  };
+  const stale = new TranscriptionJobProcessor(
+    database,
+    storage,
+    preprocessor,
+    staleEngine,
+  );
+  await stale.enqueue(source.id);
+  assert.equal(await stale.processNext(), true);
+  assert.equal(await database.transcript.count(), 0);
+  assert.equal(stale.metrics.discarded, 1);
+  await database.transcriptionJob.deleteMany();
+  const failingEngine: TranscriptionEngine = {
+    name: 'private-error-test',
+    transcribe: async () => {
+      throw new Error('private transcript and credentials');
+    },
+  };
+  const failing = new TranscriptionJobProcessor(
+    database,
+    storage,
+    preprocessor,
+    failingEngine,
+  );
+  const job = await failing.enqueue(source.id);
+  await failing.processNext();
+  assert.doesNotMatch(
+    (
+      await database.transcriptionJob.findUniqueOrThrow({
+        where: { id: job.id },
+      })
+    ).errorMessage!,
+    /private|credentials/,
+  );
+});

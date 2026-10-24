@@ -1,5 +1,9 @@
-import { guestRetentionHours } from '@sonavra/config';
-import { createDatabase, type PrismaClient } from '@sonavra/database';
+import { guestRetentionHours, logContext, logEvent } from '@sonavra/config';
+import {
+  createDatabase,
+  createQueuedTranscriptionJob,
+  type PrismaClient,
+} from '@sonavra/database';
 import {
   createS3ObjectStorageFromEnv,
   type ObjectStorage,
@@ -91,6 +95,7 @@ export class UploadService {
     const recording = await this.database.recording.create({
       data: {
         guestSessionId: guest.id,
+        requestId: logContext().requestId,
         originalFilename: media.filename,
         objectKey: upload.key,
         mimeType: media.mimeType,
@@ -100,6 +105,7 @@ export class UploadService {
       },
     });
 
+    logEvent('api', 'upload_created', { recordingId: recording.id });
     return {
       recordingId: recording.id,
       guestSessionId: guest.id,
@@ -166,12 +172,10 @@ export class UploadService {
         },
       });
       if (!active) {
-        await tx.transcriptionJob.create({
-          data: {
-            recordingId: recording.id,
-            status: 'QUEUED',
-            availableAt: new Date(),
-          },
+        const job = await createQueuedTranscriptionJob(tx, recording.id);
+        logEvent('api', 'job_queued', {
+          recordingId: recording.id,
+          jobId: job.id,
         });
       }
     });
