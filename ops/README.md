@@ -2,6 +2,8 @@
 
 The reference deployment runs Next.js, API and worker on one host, with PostgreSQL, private object storage and the model runtime in Docker. Only a TLS ingress is public. Keep the API, worker diagnostics, database, object storage and runtime private. Multi-host deployment needs an equivalent private network and ingress policy.
 
+Use the [MVP release checklist](RELEASE.md) before public launch. It separates repository verification from real-model inference, live ingress and browser acceptance evidence.
+
 ## Configuration and startup
 
 Install the configured Node.js and pnpm versions, run `pnpm install --frozen-lockfile`, apply migrations with `pnpm db:deploy`, generate the client with `pnpm db:generate` and run `pnpm build` using the deployment environment. Keep the same API port/origin at web build and startup because Next.js embeds rewrites in the build. Install all workspace dependencies: the reference host commands below use the existing TypeScript runtime.
