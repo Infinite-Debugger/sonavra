@@ -74,6 +74,8 @@ Keep the worker running: it sweeps on startup and every minute independently of 
 
 See [the production operations guide](ops/README.md) for private ingress, configuration checks, local model provisioning, operational health, JSON logs and public-endpoint limits. API and worker diagnostics distinguish service liveness from dependency/model readiness. Production startup rejects local default credentials and an externally bound API. `pnpm check:ingress` verifies Compose port bindings and runs in CI.
 
+The [MVP release checklist](ops/RELEASE.md) tracks go/no-go gates, current evidence gaps and the real-model, offline-inference, deployment and desktop/mobile acceptance procedures. Repository checks alone do not establish public-release readiness.
+
 ## Git hooks
 
 `pnpm install` configures the repository Git hooks through Husky. Before each commit, lint-staged runs ESLint and Prettier only against relevant staged files. Full build, test, typecheck, lint, and formatting verification remains in CI.
