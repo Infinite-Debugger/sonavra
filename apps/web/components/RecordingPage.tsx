@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createTranscriptDocx } from '@/lib/transcript/docx';
 import TranscriptSummary from '@/components/TranscriptSummary';
 import KeepRecordings from '@/components/KeepRecordings';
+import PrivateMediaPlayer, {
+  type PrivateMediaPlayerHandle,
+} from '@/components/PrivateMediaPlayer';
 import { useParams } from 'next/navigation';
 import {
   speakerName,
@@ -76,7 +79,7 @@ function SaveIndicator({ state }: { state: SaveState }) {
 
 export default function RecordingPage() {
   const { recordingId } = useParams<{ recordingId: string }>();
-  const mediaRef = useRef<HTMLMediaElement>(null);
+  const playerRef = useRef<PrivateMediaPlayerHandle>(null);
   const activeSegmentRef = useRef<HTMLElement>(null);
   const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const [status, setStatus] = useState<RecordingStatusResponse | null>(null);
@@ -160,11 +163,8 @@ export default function RecordingPage() {
   }, [activeSegmentId]);
 
   function seek(startMs: number) {
-    const media = mediaRef.current;
-    if (!media) return;
-    media.currentTime = startMs / 1000;
+    playerRef.current?.seek(startMs / 1000);
     setCurrentMs(startMs);
-    void media.play();
   }
 
   function scheduleSave(
@@ -316,7 +316,6 @@ export default function RecordingPage() {
   }
 
   if (transcript) {
-    const isVideo = transcript.media.mimeType.startsWith('video/');
     const query = search.trim().toLowerCase();
     const visibleSegments = transcript.segments.filter((segment) => {
       if (!query) return true;
@@ -478,29 +477,12 @@ export default function RecordingPage() {
                 <p className="mb-3 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                   Playback
                 </p>
-                {isVideo ? (
-                  <video
-                    ref={mediaRef as React.RefObject<HTMLVideoElement>}
-                    src={transcript.media.url}
-                    controls
-                    preload="metadata"
-                    onTimeUpdate={(event) =>
-                      setCurrentMs(event.currentTarget.currentTime * 1000)
-                    }
-                    className="aspect-video w-full rounded-2xl bg-black"
-                  />
-                ) : (
-                  <audio
-                    ref={mediaRef as React.RefObject<HTMLAudioElement>}
-                    src={transcript.media.url}
-                    controls
-                    preload="metadata"
-                    onTimeUpdate={(event) =>
-                      setCurrentMs(event.currentTarget.currentTime * 1000)
-                    }
-                    className="w-full"
-                  />
-                )}
+                <PrivateMediaPlayer
+                  media={transcript.media}
+                  recordingId={recordingId}
+                  playerRef={playerRef}
+                  onTimeUpdate={setCurrentMs}
+                />
                 <p className="mt-3 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
                   Click a timestamp to jump to that moment. Edit transcript text
                   and speaker names directly; changes save automatically.
