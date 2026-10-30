@@ -54,6 +54,12 @@ Account HTTP/database integration tests run when `DATABASE_URL` is set (as in CI
 
 Library integration tests also require the local object-storage service. Worker integration tests create and remove a disposable database, so the test database role must have `CREATEDB` permission. The default local PostgreSQL and CI roles support this. Worker test cleanup never runs against the configured application database.
 
+## Private playback
+
+The transcript workspace renews private media authorization shortly before expiry and after a network/source playback failure. Renewal uses same-origin `/api/recordings/:id/media`, rechecks account/guest access and pending deletion, and returns only media metadata. Download URLs remain capped at one hour and guest URLs are additionally bounded by both the recording and guest-session deadlines. Renewal does not reload transcript text or discard local edits.
+
+Replacing a URL restores the playback position and whether audio/video was playing or paused. Browsers that block automatic resumption show an explicit **Play** button. Automatic recovery allows at most two renewal attempts per failure sequence, with a ten-second request timeout; connectivity and loading failures offer **Retry playback**. Expired or removed access stops automatic renewal and explains how to recover. Existing signed URLs remain subject to their expiry and object availability.
+
 ## Transcript summaries
 
 Completed transcripts have an optional **AI summary** panel with an overview, key points and explicit action items. Summaries are generated only on request and stored separately from transcript segments; they do not alter source text, playback, copy or exports. **Regenerate summary** replaces a saved summary only after successful generation. A failed request leaves the previous summary and transcript available. Saved transcript or speaker edits mark existing summaries as outdated; save edits before regenerating. Summary records are removed with their transcript, including guest retention cleanup.

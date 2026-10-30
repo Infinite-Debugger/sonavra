@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Headers,
   HttpCode,
   HttpException,
@@ -15,6 +16,7 @@ import {
 import type {
   CompleteUploadRequest,
   CreateUploadRequest,
+  RecordingMediaResponse,
   RecordingStatusResponse,
   TranscriptResponse,
   UpdateTranscriptSegmentRequest,
@@ -46,6 +48,31 @@ const storage = createS3ObjectStorageFromEnv();
 
 @Controller()
 export class AppController {
+  private async signMedia(recording: {
+    objectKey: string;
+    mimeType: string;
+    expiresAt: Date | null;
+    guestSession: { expiresAt: Date } | null;
+  }): Promise<RecordingMediaResponse> {
+    const deadlines = [
+      recording.expiresAt,
+      recording.guestSession?.expiresAt,
+    ].filter((date): date is Date => Boolean(date));
+    const ttl = Math.min(
+      3600,
+      ...deadlines.map((date) =>
+        Math.floor((date.getTime() - Date.now()) / 1000),
+      ),
+    );
+    if (ttl < 1) throw new NotFoundException('Recording not found');
+    const media = await storage.presignDownload(recording.objectKey, ttl);
+    return {
+      url: media.url,
+      mimeType: recording.mimeType,
+      expiresAt: media.expiresAt.toISOString(),
+    };
+  }
+
   async onModuleDestroy() {
     await auth.close();
   }
@@ -135,7 +162,24 @@ export class AppController {
     };
   }
 
+  @Get('recordings/:recordingId/media')
+  @Header('Cache-Control', 'no-store')
+  async recordingMedia(
+    @Param('recordingId') recordingId: string,
+    @Query('guestSessionId') guestSessionId: string,
+    @Headers('cookie') cookie: string | undefined,
+  ): Promise<RecordingMediaResponse> {
+    const access = await recordingAccess(auth, cookie, guestSessionId);
+    const recording = await database.recording.findFirst({
+      where: { id: recordingId, ...access.where },
+      include: { guestSession: true },
+    });
+    if (!recording) throw new NotFoundException('Recording not found');
+    return this.signMedia(recording);
+  }
+
   @Get('recordings/:recordingId/transcript')
+  @Header('Cache-Control', 'no-store')
   async transcript(
     @Param('recordingId') recordingId: string,
     @Query('guestSessionId') guestSessionId: string,
@@ -145,6 +189,7 @@ export class AppController {
     const recording = await database.recording.findFirst({
       where: { id: recordingId, ...access.where },
       include: {
+        guestSession: true,
         transcript: {
           include: {
             speakers: true,
@@ -156,18 +201,14 @@ export class AppController {
     if (!recording || !recording.transcript) {
       throw new NotFoundException('Transcript not found');
     }
-    const media = await storage.presignDownload(recording.objectKey, 60 * 60);
+    const media = await this.signMedia(recording);
     return {
       recordingId,
       filename: recording.originalFilename,
       title: recording.title,
       language: recording.transcript.language,
       durationMs: recording.durationMs,
-      media: {
-        url: media.url,
-        mimeType: recording.mimeType,
-        expiresAt: media.expiresAt.toISOString(),
-      },
+      media,
       speakers: recording.transcript.speakers.map((speaker) => ({
         id: speaker.id,
         label: speaker.label,

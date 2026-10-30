@@ -40,17 +40,19 @@ export interface RecordingStatusResponse {
   expiresAt: string | null;
 }
 
+export interface RecordingMediaResponse {
+  url: string;
+  mimeType: string;
+  expiresAt: string;
+}
+
 export interface TranscriptResponse {
   recordingId: string;
   filename: string;
   title?: string | null;
   language: string | null;
   durationMs: number | null;
-  media: {
-    url: string;
-    mimeType: string;
-    expiresAt: string;
-  };
+  media: RecordingMediaResponse;
   speakers: Array<{
     id: string;
     label: string;
