@@ -203,7 +203,11 @@ describe(
               await request(
                 segmentPath,
                 cookie,
-                { guestSessionId: guestA, text: 'Unauthorized edit.' },
+                {
+                  guestSessionId: guestA,
+                  text: 'Unauthorized edit.',
+                  revision: transcript.revision,
+                },
                 'PATCH',
               )
             ).status,
@@ -214,7 +218,11 @@ describe(
               await request(
                 speakerPath,
                 cookie,
-                { guestSessionId: guestA, displayName: 'Unauthorized speaker' },
+                {
+                  guestSessionId: guestA,
+                  displayName: 'Unauthorized speaker',
+                  revision: transcript.revision,
+                },
                 'PATCH',
               )
             ).status,
@@ -236,7 +244,7 @@ describe(
             await request(
               segmentPath,
               cookieA,
-              { text: 'Owned edit.' },
+              { text: 'Owned edit.', revision: transcript.revision },
               'PATCH',
               'https://untrusted.example',
             )
@@ -248,7 +256,7 @@ describe(
             await request(
               segmentPath,
               cookieA,
-              { text: 'Owned edit.' },
+              { text: 'Owned edit.', revision: transcript.revision },
               'PATCH',
             )
           ).status,
@@ -259,7 +267,14 @@ describe(
             await request(
               speakerPath,
               cookieA,
-              { displayName: 'Owned speaker' },
+              {
+                displayName: 'Owned speaker',
+                revision: (
+                  await database.transcript.findUniqueOrThrow({
+                    where: { id: transcript.id },
+                  })
+                ).revision,
+              },
               'PATCH',
             )
           ).status,

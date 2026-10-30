@@ -54,6 +54,14 @@ Account HTTP/database integration tests run when `DATABASE_URL` is set (as in CI
 
 Library integration tests also require the local object-storage service. Worker integration tests create and remove a disposable database, so the test database role must have `CREATEDB` permission. The default local PostgreSQL and CI roles support this. Worker test cleanup never runs against the configured application database.
 
+## Transcript editing and conflicts
+
+Text corrections and speaker renames autosave after a short typing pause. A shared transcript revision protects all editable fields: the API requires the revision returned by the transcript read and returns a new opaque revision after each successful edit. Stale writes receive HTTP 409; missing revisions receive HTTP 428 and require a fresh read. Apply the new migration with `pnpm db:deploy` and regenerate the client with `pnpm db:generate` before deploying the API and web together. Existing browser tabs must reload before saving under the new contract.
+
+The browser sends one edit at a time and retains newer input while an earlier save is pending. Failed saves keep local drafts and offer **Retry saving**. After a conflict, **Load latest for comparison** displays the saved version alongside local edits; **Reapply my edits** explicitly retries them against that loaded revision. **Use latest and discard my edits** requires confirmation and loads the saved text. If fields were removed by a replacement transcript, their local text stays available to copy and automatic reapplication is disabled. Another intervening save produces another conflict rather than silently overwriting it.
+
+Unsaved drafts remain in the current page's memory and block summary generation. Accepted edits refresh summary freshness; rejected edits leave the saved transcript and summary unchanged. Drafts are not stored in browser storage. In-app links and full-page departures warn while changes are unsaved; same-document browser traversal warnings depend on a cancelable Navigation API event. Browsers may suppress unload warnings, especially when a mobile process is terminated, so save or copy important drafts before closing the page. [The Navigation API documentation](https://developer.mozilla.org/en-US/docs/Web/API/Navigation/navigate_event) describes the browser event boundary.
+
 ## Private playback
 
 The transcript workspace renews private media authorization shortly before expiry and after a network/source playback failure. Renewal uses same-origin `/api/recordings/:id/media`, rechecks account/guest access and pending deletion, and returns only media metadata. Download URLs remain capped at one hour and guest URLs are additionally bounded by both the recording and guest-session deadlines. Renewal does not reload transcript text or discard local edits.

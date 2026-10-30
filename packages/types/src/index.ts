@@ -47,6 +47,7 @@ export interface RecordingMediaResponse {
 }
 
 export interface TranscriptResponse {
+  revision: string;
   recordingId: string;
   filename: string;
   title?: string | null;
@@ -69,13 +70,19 @@ export interface TranscriptResponse {
 }
 
 export interface UpdateTranscriptSegmentRequest {
+  revision: string;
   guestSessionId?: string;
   text: string;
 }
 
 export interface UpdateTranscriptSpeakerRequest {
+  revision: string;
   guestSessionId?: string;
   displayName: string;
+}
+
+export interface TranscriptEditResponse {
+  revision: string;
 }
 export type AccountUser = { id: string; email: string };
 export type AccountSessionResponse = { user: AccountUser | null };

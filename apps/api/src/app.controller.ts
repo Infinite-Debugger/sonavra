@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ConflictException,
   Get,
   Header,
   Headers,
@@ -13,6 +14,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import type {
   CompleteUploadRequest,
   CreateUploadRequest,
@@ -205,6 +207,7 @@ export class AppController {
     return {
       recordingId,
       filename: recording.originalFilename,
+      revision: recording.transcript.revision,
       title: recording.title,
       language: recording.transcript.language,
       durationMs: recording.durationMs,
@@ -234,13 +237,6 @@ export class AppController {
     @Headers('origin') origin: string | undefined,
     @Headers('content-type') contentType: string | undefined,
   ) {
-    const access = await this.mutationAccess(
-      cookie,
-      body.guestSessionId,
-      origin,
-      contentType,
-    );
-
     let text: string;
     try {
       text = normalizeSegmentText(body.text);
@@ -251,19 +247,15 @@ export class AppController {
       throw error;
     }
 
-    const result = await database.transcriptSegment.updateMany({
-      where: {
-        id: segmentId,
-        transcript: {
-          recording: { id: recordingId, ...access.where },
-        },
-      },
-      data: { text },
-    });
-    if (result.count !== 1) {
-      throw new NotFoundException('Transcript segment not found');
-    }
-    return { id: segmentId, text };
+    return this.saveTranscriptEdit(
+      recordingId,
+      body.revision,
+      'segment',
+      segmentId,
+      text,
+      () =>
+        this.mutationAccess(cookie, body.guestSessionId, origin, contentType),
+    );
   }
 
   @Patch('recordings/:recordingId/transcript/speakers/:speakerId')
@@ -275,13 +267,6 @@ export class AppController {
     @Headers('origin') origin: string | undefined,
     @Headers('content-type') contentType: string | undefined,
   ) {
-    const access = await this.mutationAccess(
-      cookie,
-      body.guestSessionId,
-      origin,
-      contentType,
-    );
-
     let displayName: string;
     try {
       displayName = normalizeSpeakerName(body.displayName);
@@ -292,19 +277,77 @@ export class AppController {
       throw error;
     }
 
-    const result = await database.speaker.updateMany({
-      where: {
-        id: speakerId,
-        transcript: {
-          recording: { id: recordingId, ...access.where },
-        },
-      },
-      data: { displayName },
+    return this.saveTranscriptEdit(
+      recordingId,
+      body.revision,
+      'speaker',
+      speakerId,
+      displayName,
+      () =>
+        this.mutationAccess(cookie, body.guestSessionId, origin, contentType),
+    );
+  }
+
+  private async saveTranscriptEdit(
+    recordingId: string,
+    revision: unknown,
+    kind: 'segment' | 'speaker',
+    id: string,
+    value: string,
+    authorize: () => ReturnType<AppController['mutationAccess']>,
+  ) {
+    return database.$transaction(async (tx) => {
+      // Use the same lock order as deletion, claims, summary persistence and workers.
+      await tx.$queryRaw`SELECT "id" FROM "Recording" WHERE "id" = ${recordingId}::uuid FOR UPDATE`;
+      const access = await authorize();
+      const recording = await tx.recording.findFirst({
+        where: { id: recordingId, ...access.where },
+        include: { transcript: true },
+      });
+      if (!recording?.transcript)
+        throw new NotFoundException('Transcript not found');
+      if (revision === undefined)
+        throw new HttpException(
+          'Reload the transcript before saving changes.',
+          428,
+        );
+      if (
+        typeof revision !== 'string' ||
+        !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
+          revision,
+        )
+      )
+        throw new BadRequestException(
+          'A valid transcript revision is required.',
+        );
+      if (recording.transcript.revision !== revision)
+        throw new ConflictException(
+          'This transcript changed elsewhere. Review the latest version before reapplying your edits.',
+        );
+      const where = { id, transcriptId: recording.transcript.id };
+      const changed =
+        kind === 'segment'
+          ? await tx.transcriptSegment.updateMany({
+              where,
+              data: { text: value },
+            })
+          : await tx.speaker.updateMany({
+              where,
+              data: { displayName: value },
+            });
+      if (!changed.count)
+        throw new NotFoundException('Transcript field not found');
+      const next = randomUUID();
+      await tx.transcript.update({
+        where: { id: recording.transcript.id },
+        data: { revision: next },
+      });
+      return {
+        id,
+        revision: next,
+        ...(kind === 'segment' ? { text: value } : { displayName: value }),
+      };
     });
-    if (result.count !== 1) {
-      throw new NotFoundException('Transcript speaker not found');
-    }
-    return { id: speakerId, displayName };
   }
 
   @Post('recordings/:recordingId/transcription-jobs')

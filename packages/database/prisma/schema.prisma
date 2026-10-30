@@ -105,6 +105,7 @@ model TranscriptionJob {
 
 model Transcript {
   id          String              @id @default(uuid()) @db.Uuid
+  revision    String              @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   recordingId String              @unique @db.Uuid
   recording   Recording           @relation(fields: [recordingId], references: [id], onDelete: Cascade)
   language    String?
