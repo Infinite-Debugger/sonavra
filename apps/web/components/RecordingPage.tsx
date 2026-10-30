@@ -16,32 +16,31 @@ import {
 } from '@/lib/transcript/exports';
 import type {
   RecordingStatusResponse,
+  TranscriptEditResponse,
   TranscriptResponse,
 } from '@sonavra/types';
 
-type SaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
+import {
+  TranscriptAutosave,
+  reapplyTranscriptDrafts,
+  EditConflict,
+  type SaveState,
+  type TranscriptDraft,
+} from '@/lib/transcript/autosave';
+import TranscriptEditRecovery from '@/components/TranscriptEditRecovery';
+import { useUnsavedTranscriptWarning } from '@/lib/transcript/use-unsaved-warning';
 
-async function getJson<T>(path: string, guestSessionId?: string | null) {
+async function getJson<T>(
+  path: string,
+  guestSessionId?: string | null,
+  signal?: AbortSignal,
+) {
   const response = await fetch(
     `/api${path}${guestSessionId ? `?guestSessionId=${encodeURIComponent(guestSessionId)}` : ''}`,
-    { cache: 'no-store' },
+    { cache: 'no-store', signal },
   );
   if (!response.ok) throw new Error('Unable to load this recording.');
   return (await response.json()) as T;
-}
-
-async function patchJson(path: string, body: Record<string, string>) {
-  const response = await fetch(`/api${path}`, {
-    method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as {
-      message?: string;
-    } | null;
-    throw new Error(payload?.message ?? 'Unable to save your changes.');
-  }
 }
 
 function formatTime(ms: number) {
@@ -61,13 +60,14 @@ function SaveIndicator({ state }: { state: SaveState }) {
     saving: 'Saving…',
     saved: 'Saved',
     error: 'Save failed',
+    conflict: 'Conflicting changes',
   }[state];
 
   return (
     <span
       role="status"
       className={`text-xs ${
-        state === 'error'
+        state === 'error' || state === 'conflict'
           ? 'text-red-600 dark:text-red-400'
           : 'text-zinc-500 dark:text-zinc-400'
       }`}
@@ -81,7 +81,11 @@ export default function RecordingPage() {
   const { recordingId } = useParams<{ recordingId: string }>();
   const playerRef = useRef<PrivateMediaPlayerHandle>(null);
   const activeSegmentRef = useRef<HTMLElement>(null);
-  const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const autosave = useRef<TranscriptAutosave | null>(null);
+  const [drafts, setDrafts] = useState<TranscriptDraft[]>([]);
+  const [latest, setLatest] = useState<TranscriptResponse | null>(null);
+  const [loadingLatest, setLoadingLatest] = useState(false);
+  useUnsavedTranscriptWarning(drafts.length > 0);
   const [status, setStatus] = useState<RecordingStatusResponse | null>(null);
   const [transcript, setTranscript] = useState<TranscriptResponse | null>(null);
   const [currentMs, setCurrentMs] = useState(0);
@@ -97,6 +101,14 @@ export default function RecordingPage() {
     const guestSessionId = localStorage.getItem('sonavraGuestSessionId');
 
     let stopped = false;
+    let manager: TranscriptAutosave | null = null;
+    setTranscript(null);
+    setLatest(null);
+    setDrafts([]);
+    setSaveState('idle');
+    setSaveError('');
+    setError('');
+    setLoadingLatest(false);
     let timer: ReturnType<typeof setTimeout>;
 
     async function poll() {
@@ -112,7 +124,42 @@ export default function RecordingPage() {
             `/recordings/${recordingId}/transcript`,
             guestSessionId,
           );
-          if (!stopped) setTranscript(result);
+          if (!stopped) {
+            manager = new TranscriptAutosave(
+              result.revision,
+              async (draft, revision, signal) => {
+                const guest = localStorage.getItem('sonavraGuestSessionId');
+                const response = await fetch(
+                  `/api/recordings/${recordingId}/transcript/${draft.kind === 'segment' ? 'segments' : 'speakers'}/${draft.id}`,
+                  {
+                    method: 'PATCH',
+                    headers: { 'content-type': 'application/json' },
+                    signal: AbortSignal.any([
+                      signal,
+                      AbortSignal.timeout(10_000),
+                    ]),
+                    body: JSON.stringify({
+                      revision,
+                      guestSessionId: guest ?? undefined,
+                      [draft.kind === 'segment' ? 'text' : 'displayName']:
+                        draft.value,
+                    }),
+                  },
+                );
+                if (response.status === 409 || response.status === 428)
+                  throw new EditConflict();
+                if (!response.ok) throw new Error();
+                return (await response.json()) as TranscriptEditResponse;
+              },
+              (state, pending) => {
+                setSaveState(state);
+                setDrafts(pending);
+              },
+              () => setSavedRevision((revision) => revision + 1),
+            );
+            autosave.current = manager;
+            setTranscript(result);
+          }
           return;
         }
         if (next.status !== 'FAILED') timer = setTimeout(poll, 1500);
@@ -131,15 +178,10 @@ export default function RecordingPage() {
     return () => {
       stopped = true;
       clearTimeout(timer);
+      manager?.dispose();
+      if (autosave.current === manager) autosave.current = null;
     };
   }, [recordingId]);
-
-  useEffect(() => {
-    const timers = saveTimers.current;
-    return () => {
-      for (const timer of timers.values()) clearTimeout(timer);
-    };
-  }, []);
 
   useEffect(() => {
     if (!transcript) return;
@@ -167,41 +209,6 @@ export default function RecordingPage() {
     setCurrentMs(startMs);
   }
 
-  function scheduleSave(
-    key: string,
-    path: string,
-    payload: Record<string, string>,
-  ) {
-    const guestSessionId = localStorage.getItem('sonavraGuestSessionId');
-
-    const currentTimer = saveTimers.current.get(key);
-    if (currentTimer) clearTimeout(currentTimer);
-    setSaveState('dirty');
-    setSaveError('');
-
-    const timer = setTimeout(async () => {
-      setSaveState('saving');
-      try {
-        await patchJson(
-          path,
-          guestSessionId ? { ...payload, guestSessionId } : payload,
-        );
-        saveTimers.current.delete(key);
-        setSaveState(saveTimers.current.size ? 'dirty' : 'saved');
-        setSavedRevision((revision) => revision + 1);
-      } catch (cause) {
-        saveTimers.current.delete(key);
-        setSaveState('error');
-        setSaveError(
-          cause instanceof Error
-            ? cause.message
-            : 'Unable to save your changes.',
-        );
-      }
-    }, 650);
-    saveTimers.current.set(key, timer);
-  }
-
   function updateSegment(segmentId: string, text: string) {
     setTranscript((current) =>
       current
@@ -213,11 +220,7 @@ export default function RecordingPage() {
           }
         : current,
     );
-    scheduleSave(
-      `segment:${segmentId}`,
-      `/recordings/${recordingId}/transcript/segments/${segmentId}`,
-      { text },
-    );
+    autosave.current?.edit({ kind: 'segment', id: segmentId, value: text });
   }
 
   function updateSpeaker(speakerId: string, displayName: string) {
@@ -231,11 +234,60 @@ export default function RecordingPage() {
           }
         : current,
     );
-    scheduleSave(
-      `speaker:${speakerId}`,
-      `/recordings/${recordingId}/transcript/speakers/${speakerId}`,
-      { displayName },
-    );
+    autosave.current?.edit({
+      kind: 'speaker',
+      id: speakerId,
+      value: displayName,
+    });
+  }
+
+  async function loadLatest() {
+    const manager = autosave.current;
+    if (!manager) return;
+    setLoadingLatest(true);
+    setSaveError('');
+    try {
+      const next = await getJson<TranscriptResponse>(
+        `/recordings/${recordingId}/transcript`,
+        localStorage.getItem('sonavraGuestSessionId'),
+        AbortSignal.timeout(10_000),
+      );
+      if (autosave.current === manager) setLatest(next);
+    } catch {
+      if (autosave.current === manager)
+        setSaveError(
+          'Unable to load the latest saved version. Your local edits are still here.',
+        );
+    } finally {
+      if (autosave.current === manager) setLoadingLatest(false);
+    }
+  }
+
+  function recover(discard: boolean) {
+    if (!latest || !autosave.current) return;
+    if (
+      discard &&
+      !window.confirm(
+        'Discard all unsaved transcript and speaker edits and use the latest saved version?',
+      )
+    )
+      return;
+    const pending = discard ? [] : autosave.current.pending;
+    const merged = reapplyTranscriptDrafts(latest, pending);
+    if (!merged) {
+      setSaveError(
+        'Some edited fields were removed. Copy your local text before discarding it.',
+      );
+      return;
+    }
+    setTranscript((current) => ({
+      ...merged,
+      media: current?.media ?? merged.media,
+    }));
+    autosave.current.recover(latest.revision, discard);
+    setLatest(null);
+    setSaveError('');
+    setSavedRevision((revision) => revision + 1);
   }
 
   async function copyTranscript() {
@@ -346,7 +398,7 @@ export default function RecordingPage() {
             </p>
             {saveError && (
               <p className="mt-3 text-sm text-red-600 dark:text-red-400">
-                {saveError} Your edit is still visible here so you can retry it.
+                {saveError}
               </p>
             )}
             <KeepRecordings
@@ -366,13 +418,29 @@ export default function RecordingPage() {
             />
           </header>
 
+          {(saveState === 'error' || saveState === 'conflict') && (
+            <TranscriptEditRecovery
+              state={saveState}
+              drafts={drafts}
+              latest={latest}
+              loading={loadingLatest}
+              onLoad={() => void loadLatest()}
+              onReapply={() => recover(false)}
+              onDiscard={() => recover(true)}
+              onRetry={() => {
+                setLatest(null);
+                autosave.current?.retry();
+              }}
+            />
+          )}
           <TranscriptSummary
             recordingId={recordingId}
             revision={savedRevision}
             hasUnsavedChanges={
               saveState === 'dirty' ||
               saveState === 'saving' ||
-              saveState === 'error'
+              saveState === 'error' ||
+              saveState === 'conflict'
             }
           />
 
